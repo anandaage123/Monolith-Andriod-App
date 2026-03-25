@@ -84,8 +84,11 @@ export default function VaultScreen() {
   };
 
   const pickAndHideImage = async () => {
-    const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
-    if (status !== 'granted') return Alert.alert("Permission Required", "Need media library access to hide photos.");
+    let hasMediaLibAccess = false;
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+      if (status === 'granted') hasMediaLibAccess = true;
+    } catch (e) { console.log('Expo Go Media Lib Warning'); }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images', 'videos'], quality: 1,
@@ -119,8 +122,11 @@ export default function VaultScreen() {
   const unhideItem = async () => {
     if (!selectedItem) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
-      if (status !== 'granted') return Alert.alert("Permission Required...");
+      let hasMediaLibAccess = false;
+      try {
+        const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
+        if (status === 'granted') hasMediaLibAccess = true;
+      } catch (e) { console.log('Expo Go Media Lib Warning'); }
       
       let successfullyRestored = false;
       

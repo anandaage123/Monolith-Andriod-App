@@ -211,7 +211,7 @@ export default function NotesScreen() {
       </View>
       
       {!hasRegisteredPin && (
-         <TouchableOpacity onPress={() => setHasRegisteredPin(true)} style={styles.warningBox}>
+         <TouchableOpacity onPress={() => setIsAuthenticated(false)} style={styles.warningBox}>
             <Ionicons name="lock-open-outline" size={20} color="#FFD700" />
             <Text style={{...Typography.body, color: "#FFD700", marginLeft: 10, flex: 1}}>Set a PIN to lock this Journal.</Text>
          </TouchableOpacity>
