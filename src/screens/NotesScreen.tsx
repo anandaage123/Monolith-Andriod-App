@@ -45,14 +45,14 @@ export default function NotesScreen() {
       content: currentNote.content || '',
       date: new Date().toLocaleDateString(),
     };
-    
+
     let updatedNotes;
     if (currentNote.id) {
       updatedNotes = notes.map(n => n.id === currentNote.id ? newNote : n);
     } else {
       updatedNotes = [newNote, ...notes];
     }
-    
+
     saveNotes(updatedNotes);
     setIsEditing(false);
     setCurrentNote({});
@@ -61,9 +61,11 @@ export default function NotesScreen() {
   const deleteNote = (id: string) => {
     Alert.alert('Delete Note', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => {
-        saveNotes(notes.filter(n => n.id !== id));
-      }},
+      {
+        text: 'Delete', style: 'destructive', onPress: () => {
+          saveNotes(notes.filter(n => n.id !== id));
+        }
+      },
     ]);
   };
 
@@ -111,8 +113,8 @@ export default function NotesScreen() {
         numColumns={2}
         columnWrapperStyle={styles.row}
         renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.noteCard} 
+          <TouchableOpacity
+            style={styles.noteCard}
             onPress={() => { setCurrentNote(item); setIsEditing(true); }}
             onLongPress={() => deleteNote(item.id)}
           >

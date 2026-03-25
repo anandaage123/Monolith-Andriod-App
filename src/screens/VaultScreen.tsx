@@ -32,12 +32,12 @@ export default function VaultScreen() {
   if (!isAuthenticated) {
     return (
       <View style={styles.authContainer}>
-        <Ionicons name="lock-closed" size={50} color={Colors.primary} style={{marginBottom: 30}} />
+        <Ionicons name="lock-closed" size={50} color={Colors.primary} style={{ marginBottom: 30 }} />
         <Text style={styles.authTitle}>Enter Vault PIN</Text>
         <Text style={styles.pinDisplay}>{'*'.repeat(pin.length)}</Text>
-        
+
         <View style={styles.numpad}>
-          {[1,2,3,4,5,6,7,8,9].map(num => (
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
             <TouchableOpacity key={num} style={styles.numBtn} onPress={() => handlePin(num.toString())}>
               <Text style={styles.numText}>{num}</Text>
             </TouchableOpacity>
