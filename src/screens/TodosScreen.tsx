@@ -20,19 +20,19 @@ export default function TodosScreen() {
 
   const loadTodos = async () => {
     try {
-      const stored = await AsyncStorage.getItem('@todos');
+      const stored = await AsyncStorage.getItem('@daily_todos_v2');
       if (stored) setTodos(JSON.parse(stored));
     } catch (e) {
-      console.error(e);
+      console.log('Failed to load todos', e);
     }
   };
 
   const saveTodos = async (newTodos: Todo[]) => {
+    setTodos(newTodos); // Optimistic UI update immediately
     try {
-      await AsyncStorage.setItem('@todos', JSON.stringify(newTodos));
-      setTodos(newTodos);
+      await AsyncStorage.setItem('@daily_todos_v2', JSON.stringify(newTodos));
     } catch (e) {
-      console.error(e);
+      console.log('Failed to save todos', e);
     }
   };
 
@@ -94,75 +94,16 @@ export default function TodosScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    padding: 20,
-    paddingTop: 60,
-  },
-  header: {
-    ...Typography.header,
-    marginBottom: 20,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    color: Colors.text,
-    padding: 15,
-    borderRadius: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  addButton: {
-    backgroundColor: Colors.primary,
-    padding: 15,
-    borderRadius: 12,
-    marginLeft: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  todoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  todoContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: Colors.primary,
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxCompleted: {
-    backgroundColor: Colors.primary,
-  },
-  todoText: {
-    ...Typography.body,
-    flex: 1,
-  },
-  todoTextCompleted: {
-    color: Colors.textMuted,
-    textDecorationLine: 'line-through',
-  },
-  deleteButton: {
-    padding: 5,
-  },
+  container: { flex: 1, backgroundColor: Colors.background, padding: 20, paddingTop: 60 },
+  header: { ...Typography.header, marginBottom: 20 },
+  inputContainer: { flexDirection: 'row', marginBottom: 20 },
+  input: { flex: 1, backgroundColor: Colors.surface, color: Colors.text, padding: 15, borderRadius: 12, fontSize: 16, borderWidth: 1, borderColor: Colors.border },
+  addButton: { backgroundColor: Colors.primary, padding: 15, borderRadius: 12, marginLeft: 10, justifyContent: 'center', alignItems: 'center' },
+  todoItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, padding: 15, borderRadius: 12, marginBottom: 10, borderWidth: 1, borderColor: Colors.border },
+  todoContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  checkbox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: Colors.primary, marginRight: 10, justifyContent: 'center', alignItems: 'center' },
+  checkboxCompleted: { backgroundColor: Colors.primary },
+  todoText: { ...Typography.body, flex: 1 },
+  todoTextCompleted: { color: Colors.textMuted, textDecorationLine: 'line-through' },
+  deleteButton: { padding: 5 }
 });
