@@ -12,7 +12,7 @@ interface HiddenItem {
   id: string;
   uri: string;
   type: 'image' | 'video' | 'mixed';
-  originalAssetId?: string;
+  originalUri?: string; // Track exact original location hook
 }
 
 export default function VaultScreen() {
@@ -22,8 +22,8 @@ export default function VaultScreen() {
   const [hiddenItems, setHiddenItems] = useState<HiddenItem[]>([]);
   const navigation = useNavigation();
 
-  // Action Modal
   const [selectedItem, setSelectedItem] = useState<HiddenItem | null>(null);
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
 
   useEffect(() => {
     checkPinStatus();
@@ -34,7 +34,22 @@ export default function VaultScreen() {
     try {
       const savedPin = await AsyncStorage.getItem('@vault_pin');
       setHasRegisteredPin(!!savedPin);
+      if (!savedPin) {
+        setIsAuthenticated(true); // If PIN doesn't exist, bypass authentication
+      }
     } catch (e) {}
+  };
+
+  const removePin = async () => {
+    Alert.alert("Remove PIN", "Are you sure? Anyone with access to the app will be able to view hidden files.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: async () => {
+         await AsyncStorage.removeItem('@vault_pin');
+         setHasRegisteredPin(false);
+         setIsSettingsVisible(false);
+         Alert.alert("Success", "Vault PIN removed.");
+      }}
+    ]);
   };
 
   const loadHiddenItems = async () => {
@@ -56,7 +71,8 @@ export default function VaultScreen() {
       setTimeout(async () => {
         if (!hasRegisteredPin) {
           await AsyncStorage.setItem('@vault_pin', newPin);
-          setHasRegisteredPin(true); setIsAuthenticated(true);
+          setHasRegisteredPin(true);
+          setIsAuthenticated(true);
         } else {
           const savedPin = await AsyncStorage.getItem('@vault_pin');
           if (newPin === savedPin) setIsAuthenticated(true);
@@ -83,22 +99,20 @@ export default function VaultScreen() {
         const newUri = `${FileSystem.documentDirectory}hidden_${Date.now()}.${fileExt}`;
         await FileSystem.copyAsync({ from: asset.uri, to: newUri });
 
-        // Authentically Delete the original from phone!
         if (asset.assetId) {
           try {
             await MediaLibrary.deleteAssetsAsync([asset.assetId]);
-          } catch(e) { console.log('Could not delete original', e) }
+          } catch(e) {}
         }
 
         const newItem: HiddenItem = {
           id: Date.now().toString(),
           uri: newUri,
           type: asset.type === 'video' ? 'video' : 'image',
+          originalUri: asset.uri, // Store initial original path 
         };
         await saveHiddenItems([newItem, ...hiddenItems]);
-      } catch (err) {
-        console.log("Vault Error: ", err);
-      }
+      } catch (err) {}
     }
   };
 
@@ -108,15 +122,30 @@ export default function VaultScreen() {
       const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo', 'video']);
       if (status !== 'granted') return Alert.alert("Permission Required...");
       
-      // Save back to general photo album
-      await MediaLibrary.saveToLibraryAsync(selectedItem.uri);
+      let successfullyRestored = false;
       
-      // Remove from Vault
+      // Attempt 1: Native FileSys Move to Original exact folder structure
+      if (selectedItem.originalUri) {
+         try {
+            // @ts-ignore
+            await FileSystem.copyAsync({ from: selectedItem.uri, to: selectedItem.originalUri });
+            // Alert Android Media Scanner
+            await MediaLibrary.createAssetAsync(selectedItem.originalUri); 
+            successfullyRestored = true;
+         } catch(e) {}
+      }
+      
+      // Attempt 2: Fallback to General Gallery
+      if (!successfullyRestored) {
+        await MediaLibrary.saveToLibraryAsync(selectedItem.uri);
+      }
+      
+      // @ts-ignore
       await FileSystem.deleteAsync(selectedItem.uri, { idempotent: true });
       await saveHiddenItems(hiddenItems.filter(i => i.id !== selectedItem.id));
       
       setSelectedItem(null);
-      Alert.alert("Unhidden", "Item successfully restored to your gallery!");
+      Alert.alert("Unhidden", "Item successfully restored to the OS gallery!");
     } catch(e) {
       Alert.alert("Error", "Could not restore the file.");
     }
@@ -125,6 +154,7 @@ export default function VaultScreen() {
   const permanentlyDelete = async () => {
     if (!selectedItem) return;
     try {
+      // @ts-ignore
       await FileSystem.deleteAsync(selectedItem.uri, { idempotent: true });
       await saveHiddenItems(hiddenItems.filter(i => i.id !== selectedItem.id));
       setSelectedItem(null);
@@ -133,11 +163,11 @@ export default function VaultScreen() {
 
   if (hasRegisteredPin === null) return null;
 
-  if (!isAuthenticated) {
+  if (hasRegisteredPin && !isAuthenticated) {
     return (
       <View style={styles.authContainer}>
         <Ionicons name="lock-closed" size={50} color={Colors.primary} style={{marginBottom: 30}} />
-        <Text style={styles.authTitle}>{!hasRegisteredPin ? "Create Vault PIN" : "Enter Vault PIN"}</Text>
+        <Text style={styles.authTitle}>Enter Vault PIN</Text>
         <Text style={styles.pinDisplay}>{'*'.repeat(pin.length)}</Text>
         <View style={styles.numpad}>
           {[1,2,3,4,5,6,7,8,9].map(num => (
@@ -166,10 +196,22 @@ export default function VaultScreen() {
           <Ionicons name="arrow-back" size={28} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Secure Vault</Text>
-        <TouchableOpacity onPress={pickAndHideImage}>
-          <Ionicons name="add-circle" size={32} color={Colors.secondary} />
-        </TouchableOpacity>
+        <View style={{flexDirection: 'row'}}>
+           <TouchableOpacity onPress={() => setIsSettingsVisible(true)} style={{marginRight: 20}}>
+             <Ionicons name="settings" size={30} color={Colors.textSecondary} />
+           </TouchableOpacity>
+           <TouchableOpacity onPress={pickAndHideImage}>
+             <Ionicons name="add-circle" size={32} color={Colors.secondary} />
+           </TouchableOpacity>
+        </View>
       </View>
+
+      {!hasRegisteredPin && (
+         <TouchableOpacity onPress={() => setIsAuthenticated(false)} style={styles.warningBox}>
+            <Ionicons name="warning" size={24} color="#FFD700" />
+            <Text style={{...Typography.body, color: "#FFD700", marginLeft: 10, flex: 1}}>Set up a PIN to lock this Vault.</Text>
+         </TouchableOpacity>
+      )}
 
       <Text style={styles.subtitle}>Hidden Files ({hiddenItems.length})</Text>
 
@@ -182,10 +224,9 @@ export default function VaultScreen() {
             <Image source={{ uri: item.uri }} style={styles.hiddenImage} />
           </TouchableOpacity>
         )}
-        ListEmptyComponent={<Text style={{color: Colors.textMuted, textAlign: 'center', marginTop: 50}}>Tap top-right to authentically hide photos/videos here.</Text>}
+        ListEmptyComponent={<Text style={{color: Colors.textMuted, textAlign: 'center', marginTop: 50}}>Tap '+' to authentically hide photos/videos here.</Text>}
       />
 
-      {/* Action Modal */}
       <Modal visible={!!selectedItem} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -194,7 +235,7 @@ export default function VaultScreen() {
              
              <TouchableOpacity style={styles.actionBtn} onPress={unhideItem}>
                 <Ionicons name="eye-outline" size={24} color={Colors.text} style={{marginRight: 10}} />
-                <Text style={styles.actionText}>Unhide (Restore to Gallery)</Text>
+                <Text style={styles.actionText}>Unhide (Original Location)</Text>
              </TouchableOpacity>
 
              <TouchableOpacity style={[styles.actionBtn, {backgroundColor: Colors.accent + '30'}]} onPress={permanentlyDelete}>
@@ -209,6 +250,24 @@ export default function VaultScreen() {
         </View>
       </Modal>
 
+      <Modal visible={isSettingsVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+             <Text style={styles.modalTitle}>Vault Settings</Text>
+             
+             {hasRegisteredPin && (
+               <TouchableOpacity style={styles.actionBtn} onPress={removePin}>
+                  <Ionicons name="lock-open-outline" size={24} color={Colors.text} style={{marginRight: 10}} />
+                  <Text style={styles.actionText}>Remove Security PIN</Text>
+               </TouchableOpacity>
+             )}
+             
+             <TouchableOpacity style={{marginTop: 15}} onPress={() => setIsSettingsVisible(false)}>
+                <Text style={{color: Colors.textMuted, fontWeight: 'bold'}}>Close</Text>
+             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -224,6 +283,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 30 },
   title: { ...Typography.header },
   subtitle: { ...Typography.body, color: Colors.textSecondary, marginBottom: 20 },
+  warningBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#332b00', padding: 15, borderRadius: 12, marginBottom: 20 },
   appCard: { flex: 1, margin: 5, borderRadius: 12, overflow: 'hidden', backgroundColor: Colors.surface, aspectRatio: 1 },
   hiddenImage: { width: '100%', height: '100%' },
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, KeyboardAvoidingView, Platform, Keyboard, Modal } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Typography } from '../theme/Theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,8 @@ export default function NotesScreen() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentNote, setCurrentNote] = useState<Partial<Note>>({});
+  
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
 
   useEffect(() => {
     checkPinStatus();
@@ -33,7 +35,22 @@ export default function NotesScreen() {
     try {
       const savedPin = await AsyncStorage.getItem('@journal_pin');
       setHasRegisteredPin(!!savedPin);
+      if (!savedPin) {
+         setIsAuthenticated(true);
+      }
     } catch (e) {}
+  };
+
+  const removePin = async () => {
+    Alert.alert("Remove PIN", "This removes the lock from your Journal.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: async () => {
+         await AsyncStorage.removeItem('@journal_pin');
+         setHasRegisteredPin(false);
+         setIsSettingsVisible(false);
+         Alert.alert("Success", "Journal PIN removed.");
+      }}
+    ]);
   };
 
   const handlePin = async (p: string) => {
@@ -112,13 +129,11 @@ export default function NotesScreen() {
 
   if (hasRegisteredPin === null) return null;
 
-  if (!isAuthenticated) {
+  if (hasRegisteredPin && !isAuthenticated) {
     return (
       <View style={styles.authContainer}>
         <Ionicons name="journal" size={50} color={Colors.primary} style={{marginBottom: 30}} />
-        <Text style={styles.authTitle}>
-          {!hasRegisteredPin ? "Create Journal PIN" : "Enter Journal PIN"}
-        </Text>
+        <Text style={styles.authTitle}>Enter Journal PIN</Text>
         <Text style={styles.pinDisplay}>{'*'.repeat(pin.length)}</Text>
         
         <View style={styles.numpad}>
@@ -185,10 +200,23 @@ export default function NotesScreen() {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.headerTitle}>Secret Journal</Text>
-        <TouchableOpacity onPress={() => { setCurrentNote({mood: '😌'}); setIsEditing(true); }}>
-          <Ionicons name="create-outline" size={28} color={Colors.primary} />
-        </TouchableOpacity>
+        <View style={{flexDirection: 'row'}}>
+           <TouchableOpacity onPress={() => setIsSettingsVisible(true)} style={{marginRight: 20}}>
+             <Ionicons name="settings-outline" size={28} color={Colors.textSecondary} />
+           </TouchableOpacity>
+           <TouchableOpacity onPress={() => { setCurrentNote({mood: '😌'}); setIsEditing(true); }}>
+             <Ionicons name="create-outline" size={28} color={Colors.primary} />
+           </TouchableOpacity>
+        </View>
       </View>
+      
+      {!hasRegisteredPin && (
+         <TouchableOpacity onPress={() => setHasRegisteredPin(true)} style={styles.warningBox}>
+            <Ionicons name="lock-open-outline" size={20} color="#FFD700" />
+            <Text style={{...Typography.body, color: "#FFD700", marginLeft: 10, flex: 1}}>Set a PIN to lock this Journal.</Text>
+         </TouchableOpacity>
+      )}
+
       <FlatList
         data={notes}
         keyExtractor={item => item.id}
@@ -210,6 +238,26 @@ export default function NotesScreen() {
         )}
         ListEmptyComponent={<Text style={{color: Colors.textMuted, textAlign: 'center', marginTop: 50}}>No notes yet. Tap the pencil icon to begin.</Text>}
       />
+
+      <Modal visible={isSettingsVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+             <Text style={styles.modalTitle}>Journal Settings</Text>
+             
+             {hasRegisteredPin && (
+               <TouchableOpacity style={styles.actionBtn} onPress={removePin}>
+                  <Ionicons name="lock-open-outline" size={24} color={Colors.text} style={{marginRight: 10}} />
+                  <Text style={styles.actionText}>Remove Journal PIN</Text>
+               </TouchableOpacity>
+             )}
+             
+             <TouchableOpacity style={{marginTop: 15}} onPress={() => setIsSettingsVisible(false)}>
+                <Text style={{color: Colors.textMuted, fontWeight: 'bold'}}>Close</Text>
+             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -226,6 +274,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, padding: 20, paddingTop: 60 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   headerTitle: { ...Typography.header },
+  warningBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#332b00', padding: 10, borderRadius: 12, marginBottom: 15 },
   row: { justifyContent: 'space-between' },
   noteCard: { backgroundColor: Colors.surface, padding: 15, borderRadius: 16, width: '48%', marginBottom: 15, borderWidth: 1, borderColor: Colors.border, height: 140 },
   noteTitle: { ...Typography.title, fontSize: 16, marginBottom: 5, flex: 1, paddingRight: 5 },
@@ -239,5 +288,11 @@ const styles = StyleSheet.create({
   titleInput: { ...Typography.header, marginVertical: 10, padding: 10 },
   contentInput: { ...Typography.body, flex: 1, padding: 10, fontSize: 16, color: Colors.text },
   saveBtn: { backgroundColor: Colors.primary, paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8 },
-  saveBtnText: { color: Colors.text, fontWeight: 'bold' }
+  saveBtnText: { color: Colors.text, fontWeight: 'bold' },
+
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { backgroundColor: Colors.surfaceHighlight, padding: 25, borderRadius: 20, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
+  modalTitle: { ...Typography.title, marginBottom: 25 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.surface, width: '100%', padding: 15, borderRadius: 12, marginBottom: 10 },
+  actionText: { ...Typography.body, fontWeight: '600' }
 });
