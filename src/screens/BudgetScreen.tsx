@@ -92,16 +92,16 @@ export default function BudgetScreen() {
             />
           ) : (
             <TouchableOpacity onPress={() => setIsEditingBudget(true)}>
-               <Text style={{...Typography.caption, color: Colors.primary}}>Limit: ${budgetLimit} <Ionicons name="pencil" /></Text>
+               <Text style={{...Typography.caption, color: Colors.primary}}>Limit: ₹{budgetLimit} <Ionicons name="pencil" /></Text>
             </TouchableOpacity>
           )}
         </View>
-        <Text style={styles.totalText}>${totalSpent.toFixed(2)}</Text>
+        <Text style={styles.totalText}>₹{totalSpent.toFixed(2)}</Text>
         
         <View style={styles.balanceBadge}>
           <Ionicons name={isOverBudget ? "warning" : "checkmark-circle"} size={18} color={isOverBudget ? Colors.accent : Colors.secondary} />
           <Text style={{...Typography.body, color: isOverBudget ? Colors.accent : Colors.secondary, fontWeight: 'bold', marginLeft: 8}}>
-            {isOverBudget ? `Over limit by $${Math.abs(remaining).toFixed(2)}` : `$${remaining.toFixed(2)} remaining`}
+            {isOverBudget ? `Over limit by ₹${Math.abs(remaining).toFixed(2)}` : `₹${remaining.toFixed(2)} remaining`}
           </Text>
         </View>
       </View>
@@ -119,7 +119,7 @@ export default function BudgetScreen() {
         <View style={{width: 100, marginRight: 10}}>
           <TextInput
             style={styles.input}
-            placeholder="$0.00"
+            placeholder="₹0.00"
             placeholderTextColor={Colors.textMuted}
             value={amount}
             keyboardType="decimal-pad"
@@ -143,7 +143,7 @@ export default function BudgetScreen() {
               <Text style={styles.expenseTitle}>{item.title}</Text>
               <Text style={{...Typography.caption, fontSize: 11}}>{item.date}</Text>
             </View>
-            <Text style={styles.expenseAmount}>-${item.amount.toFixed(2)}</Text>
+            <Text style={styles.expenseAmount}>-₹{item.amount.toFixed(2)}</Text>
           </TouchableOpacity>
         )}
         ListEmptyComponent={<Text style={{color: Colors.textMuted, textAlign: 'center', marginTop: 50}}>No expenses logged yet!</Text>}

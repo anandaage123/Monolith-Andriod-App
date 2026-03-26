@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, K
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Typography } from '../theme/Theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 
 type Mood = '😀' | '😌' | '😐' | '😩' | '😡';
 const MOODS: Mood[] = ['😀', '😌', '😐', '😩', '😡'];
@@ -19,17 +20,29 @@ export default function NotesScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasRegisteredPin, setHasRegisteredPin] = useState<boolean | null>(null);
   const [pin, setPin] = useState('');
+  
+  const [setupStep, setSetupStep] = useState<'none' | 'set' | 'confirm'>('none');
+  const [tempPin, setTempPin] = useState('');
 
   const [notes, setNotes] = useState<Note[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [currentNote, setCurrentNote] = useState<Partial<Note>>({});
   
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     checkPinStatus();
     loadNotes();
   }, []);
+
+  useEffect(() => {
+    if (!isFocused && isAuthenticated) {
+      setIsAuthenticated(false);
+      setPin('');
+      setIsEditing(false);
+    }
+  }, [isFocused]);
 
   const checkPinStatus = async () => {
     try {
@@ -39,6 +52,12 @@ export default function NotesScreen() {
          setIsAuthenticated(true);
       }
     } catch (e) {}
+  };
+
+  const startSetup = () => {
+    setIsAuthenticated(false);
+    setSetupStep('set');
+    setPin('');
   };
 
   const removePin = async () => {
@@ -59,16 +78,27 @@ export default function NotesScreen() {
     
     if (newPin.length === 4) {
       setTimeout(async () => {
-        if (!hasRegisteredPin) {
-          await AsyncStorage.setItem('@journal_pin', newPin);
-          setHasRegisteredPin(true);
-          setIsAuthenticated(true);
+        if (setupStep === 'set') {
+          setTempPin(newPin);
+          setSetupStep('confirm');
+        } else if (setupStep === 'confirm') {
+          if (newPin === tempPin) {
+             await AsyncStorage.setItem('@journal_pin', newPin);
+             setHasRegisteredPin(true);
+             setIsAuthenticated(true);
+             setSetupStep('none');
+             Alert.alert("Secured", "Journal PIN set successfully.");
+          } else {
+             Alert.alert("Error", "PINs do not match. Try again.");
+             setSetupStep('set');
+          }
         } else {
+          // Login
           const savedPin = await AsyncStorage.getItem('@journal_pin');
           if (newPin === savedPin) {
             setIsAuthenticated(true);
           } else {
-            setPin(''); 
+            Alert.alert("Error", "Incorrect PIN");
           }
         }
         setPin('');
@@ -127,13 +157,19 @@ export default function NotesScreen() {
     ]);
   };
 
+  const getAuthTitle = () => {
+    if (setupStep === 'set') return "Set New Journal PIN";
+    if (setupStep === 'confirm') return "Confirm Journal PIN";
+    return "Enter Journal PIN";
+  };
+
   if (hasRegisteredPin === null) return null;
 
-  if (hasRegisteredPin && !isAuthenticated) {
+  if ((hasRegisteredPin && !isAuthenticated) || setupStep !== 'none') {
     return (
       <View style={styles.authContainer}>
         <Ionicons name="journal" size={50} color={Colors.primary} style={{marginBottom: 30}} />
-        <Text style={styles.authTitle}>Enter Journal PIN</Text>
+        <Text style={styles.authTitle}>{getAuthTitle()}</Text>
         <Text style={styles.pinDisplay}>{'*'.repeat(pin.length)}</Text>
         
         <View style={styles.numpad}>
@@ -142,7 +178,9 @@ export default function NotesScreen() {
               <Text style={styles.numText}>{num}</Text>
             </TouchableOpacity>
           ))}
-          <View style={styles.numBtnBlank} />
+          <TouchableOpacity style={styles.numBtn} onPress={() => setupStep === 'none' ? setPin('') : startSetup()}>
+             {setupStep === 'none' ? <View /> : <Ionicons name="close" size={24} color={Colors.text} />}
+          </TouchableOpacity>
           <TouchableOpacity style={styles.numBtn} onPress={() => handlePin('0')}>
             <Text style={styles.numText}>0</Text>
           </TouchableOpacity>
@@ -210,10 +248,10 @@ export default function NotesScreen() {
         </View>
       </View>
       
-      {!hasRegisteredPin && (
-         <TouchableOpacity onPress={() => setIsAuthenticated(false)} style={styles.warningBox}>
+      {!hasRegisteredPin && setupStep === 'none' && (
+         <TouchableOpacity onPress={startSetup} style={styles.warningBox}>
             <Ionicons name="lock-open-outline" size={20} color="#FFD700" />
-            <Text style={{...Typography.body, color: "#FFD700", marginLeft: 10, flex: 1}}>Set a PIN to lock this Journal.</Text>
+            <Text style={{...Typography.body, color: "#FFD700", marginLeft: 10, flex: 1}}>Set a Custom PIN to lock this Journal.</Text>
          </TouchableOpacity>
       )}
 
@@ -245,10 +283,16 @@ export default function NotesScreen() {
              <Text style={styles.modalTitle}>Journal Settings</Text>
              
              {hasRegisteredPin && (
-               <TouchableOpacity style={styles.actionBtn} onPress={removePin}>
-                  <Ionicons name="lock-open-outline" size={24} color={Colors.text} style={{marginRight: 10}} />
-                  <Text style={styles.actionText}>Remove Journal PIN</Text>
-               </TouchableOpacity>
+               <>
+                 <TouchableOpacity style={styles.actionBtn} onPress={() => {setIsSettingsVisible(false); startSetup();}}>
+                    <Ionicons name="key-outline" size={24} color={Colors.text} style={{marginRight: 10}} />
+                    <Text style={styles.actionText}>Change Journal PIN</Text>
+                 </TouchableOpacity>
+                 <TouchableOpacity style={[styles.actionBtn, {backgroundColor: Colors.accent + '30'}]} onPress={removePin}>
+                    <Ionicons name="lock-open-outline" size={24} color={Colors.accent} style={{marginRight: 10}} />
+                    <Text style={[styles.actionText, {color: Colors.accent}]}>Remove Journal PIN</Text>
+                 </TouchableOpacity>
+               </>
              )}
              
              <TouchableOpacity style={{marginTop: 15}} onPress={() => setIsSettingsVisible(false)}>
@@ -268,7 +312,6 @@ const styles = StyleSheet.create({
   pinDisplay: { ...Typography.header, letterSpacing: 20, marginBottom: 40, height: 40, color: Colors.primary },
   numpad: { flexDirection: 'row', flexWrap: 'wrap', width: 280, justifyContent: 'space-between' },
   numBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.surfaceHighlight, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-  numBtnBlank: { width: 80, height: 80, marginBottom: 15 },
   numText: { ...Typography.header },
 
   container: { flex: 1, backgroundColor: Colors.background, padding: 20, paddingTop: 60 },

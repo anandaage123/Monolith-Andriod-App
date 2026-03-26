@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Typography } from '../theme/Theme';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,7 +28,18 @@ export default function TodosScreen() {
   const loadTodos = async () => {
     try {
       const stored = await AsyncStorage.getItem('@daily_todos_v3');
-      if (stored) setTodos(JSON.parse(stored));
+      let loadedTodos: Todo[] = stored ? JSON.parse(stored) : [];
+      
+      const lastDate = await AsyncStorage.getItem('@todos_last_date');
+      const today = new Date().toDateString();
+      
+      if (lastDate !== today) {
+        loadedTodos = loadedTodos.map(t => ({ ...t, completed: false }));
+        await AsyncStorage.setItem('@todos_last_date', today);
+        await AsyncStorage.setItem('@daily_todos_v3', JSON.stringify(loadedTodos));
+      }
+      
+      setTodos(loadedTodos);
     } catch (e) {}
   };
 
@@ -61,7 +72,10 @@ export default function TodosScreen() {
   };
 
   const clearCompleted = () => {
-    saveTodos(todos.filter(t => !t.completed));
+    Alert.alert('Sweep Tasks', 'Delete all tasks?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete All', style: 'destructive', onPress: () => saveTodos([]) }
+    ]);
   };
 
   const getPriorityColor = (p: Priority) => {
