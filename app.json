@@ -2,9 +2,9 @@
   "expo": {
     "name": "Monolith",
     "slug": "daily-app",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/AppIcons/appstore.png",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -12,12 +12,13 @@
       "backgroundColor": "#1E1E2C"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/AppIcons/appstore.png"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#000000",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/AppIcons/playstore.png"
       },
       "package": "com.anandaage.dailyapp"
     },
