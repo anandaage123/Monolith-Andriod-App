@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   TextInput,
   Modal,
   DimensionValue,
@@ -20,23 +20,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { MM_Colors, Typography, Shadows, Spacing } from '../theme/Theme';
 
 const { width } = Dimensions.get('window');
-
-// Methodic Muse Palette
-const MM_Colors = {
-  primary: '#4052B6',
-  primaryLight: '#8899FF',
-  background: '#F9F5FF',
-  surface: '#FFFFFF',
-  surfaceContainer: '#E9E5FF',
-  text: '#2C2A51',
-  textVariant: '#5A5781',
-  secondary: '#765600',
-  tertiary: '#006947',
-  error: '#B41340',
-  white: '#FFFFFF',
-};
 
 const PRESET_WORK = [15, 25, 45, 60];
 const PRESET_BREAK = [5, 10, 15, 30];
@@ -84,7 +70,7 @@ export default function FocusScreen() {
       const breatheSequence = () => {
         setBreatheStatus('Inhale');
         Animated.parallel([
-          Animated.timing(pulseAnim, { toValue: 1.1, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.05, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
           Animated.sequence([
             Animated.timing(breatheTextOpacity, { toValue: 1, duration: 1000, useNativeDriver: true }),
             Animated.delay(2000),
@@ -106,9 +92,7 @@ export default function FocusScreen() {
           }
         });
       };
-
       breatheSequence();
-
       Animated.loop(
         Animated.timing(rotateAnim, { toValue: 1, duration: 10000, easing: Easing.linear, useNativeDriver: true })
       ).start();
@@ -225,28 +209,24 @@ export default function FocusScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
-      {/* Uniform App Bar */}
       <View style={styles.headerBar}>
-        <View style={styles.headerLeft}>
-           <Text style={styles.logoText}>Deep Focus</Text>
-        </View>
-        <TouchableOpacity style={styles.headerIcon} onPress={() => setShowCustomModal(true)}>
-          <Ionicons name="settings-outline" size={24} color={MM_Colors.primary} />
-        </TouchableOpacity>
+        <Text style={styles.logoText}>Deep Focus</Text>
+        <Pressable onPress={() => setShowCustomModal(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+          <Ionicons name="options-outline" size={24} color={MM_Colors.primary} />
+        </Pressable>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-
         <View style={styles.timerContainer}>
           <Animated.View style={[styles.glowRing, { transform: [{ scale: pulseAnim }] }]}>
             <View style={styles.innerTrack}>
               <View style={[styles.progressFill, { height: fillHeight }]}>
-                <LinearGradient colors={['#4052B6', '#8899FF']} style={styles.gradient} />
+                <LinearGradient colors={[MM_Colors.primary, MM_Colors.primaryLight]} style={styles.gradient} />
               </View>
               <View style={styles.timerContent}>
                 <Text style={styles.timerDigits}>{formatTime(timeLeft)}</Text>
                 <Text style={styles.timerSubText}>
-                  {!isActive ? 'PAUSED' : (mode === 'work' ? 'FLOWING...' : 'RECOVERY...')}
+                  {!isActive ? 'PAUSED' : (mode === 'work' ? 'FLOWING' : 'RECOVERY')}
                 </Text>
                 <Animated.Text style={[styles.breatheText, { opacity: breatheTextOpacity }]}>
                   {breatheStatus}
@@ -254,66 +234,62 @@ export default function FocusScreen() {
               </View>
             </View>
           </Animated.View>
-
-          <Animated.View style={[styles.decorativeCircle, { transform: [{ rotate: rotation }] }]}>
-             <Ionicons name="sparkles" size={24} color={MM_Colors.secondary} />
-          </Animated.View>
         </View>
 
         <View style={styles.modeToggle}>
-          <TouchableOpacity
-            style={[styles.modeBtn, mode === 'work' && styles.modeBtnActive]}
+          <Pressable
+            style={({ pressed }) => [styles.modeBtn, mode === 'work' && styles.modeBtnActive, { opacity: pressed ? 0.7 : 1 }]}
             onPress={() => switchMode('work')}
           >
             <MaterialCommunityIcons name="brain" size={24} color={mode === 'work' ? '#FFF' : MM_Colors.primary} />
             <Text style={[styles.modeBtnText, mode === 'work' && styles.textWhite]}>Work</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.modeBtn, mode === 'break' && styles.modeBtnActive]}
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.modeBtn, mode === 'break' && styles.modeBtnActive, { opacity: pressed ? 0.7 : 1 }]}
             onPress={() => switchMode('break')}
           >
             <Ionicons name="leaf" size={24} color={mode === 'break' ? '#FFF' : MM_Colors.primary} />
             <Text style={[styles.modeBtnText, mode === 'break' && styles.textWhite]}>Break</Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         <View style={styles.presetsSection}>
           <Text style={styles.sectionLabel}>PRESETS ({mode.toUpperCase()})</Text>
           <View style={styles.presetGrid}>
             {(mode === 'work' ? PRESET_WORK : PRESET_BREAK).map(m => (
-              <TouchableOpacity
+              <Pressable
                 key={m}
-                style={[styles.presetBtn, (mode === 'work' ? customWorkMin : customBreakMin) === m.toString() && styles.presetBtnActive]}
+                style={({ pressed }) => [
+                  styles.presetBtn,
+                  (mode === 'work' ? customWorkMin : customBreakMin) === m.toString() && styles.presetBtnActive,
+                  { opacity: pressed ? 0.7 : 1 }
+                ]}
                 onPress={() => setPreset(m, mode)}
               >
                 <Text style={[styles.presetBtnText, (mode === 'work' ? customWorkMin : customBreakMin) === m.toString() && styles.presetBtnTextActive]}>{m}m</Text>
-              </TouchableOpacity>
+              </Pressable>
             ))}
           </View>
         </View>
 
         <View style={styles.controls}>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={resetTimer}>
+          <Pressable style={({ pressed }) => [styles.secondaryBtn, { opacity: pressed ? 0.7 : 1 }]} onPress={resetTimer}>
             <Ionicons name="reload" size={24} color={MM_Colors.primary} />
-          </TouchableOpacity>
+          </Pressable>
 
-          <TouchableOpacity style={styles.mainBtn} onPress={toggleTimer}>
-            <LinearGradient colors={['#4052B6', '#8899FF']} style={styles.mainBtnGradient}>
-              <Ionicons name={isActive ? "pause" : "play"} size={32} color="#FFF" />
+          <Pressable style={({ pressed }) => [styles.mainBtn, { opacity: pressed ? 0.8 : 1 }]} onPress={toggleTimer}>
+            <LinearGradient colors={[MM_Colors.primary, MM_Colors.primaryLight]} style={styles.mainBtnGradient}>
+              <Ionicons name={isActive ? "pause" : "play"} size={28} color="#FFF" />
               <Text style={styles.mainBtnText}>{isActive ? 'PAUSE' : 'START'}</Text>
             </LinearGradient>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setShowCustomModal(true)}>
-            <Ionicons name="options" size={24} color={MM_Colors.primary} />
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </ScrollView>
 
-      <Modal visible={showCustomModal} transparent animationType="slide">
+      <Modal visible={showCustomModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Duration Settings</Text>
+            <Text style={styles.modalTitle}>Timer Settings</Text>
             <View style={styles.inputContainer}>
               <View style={styles.inputItem}>
                 <Text style={styles.inputLabel}>WORK (MIN)</Text>
@@ -334,12 +310,12 @@ export default function FocusScreen() {
                 />
               </View>
             </View>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleCustomSubmit}>
-              <Text style={styles.saveBtnText}>Update Timer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowCustomModal(false)} style={{ marginTop: 20 }}>
-              <Text style={{ color: MM_Colors.textVariant, fontWeight: '700' }}>CLOSE</Text>
-            </TouchableOpacity>
+            <Pressable style={({ pressed }) => [styles.saveBtn, { opacity: pressed ? 0.7 : 1 }]} onPress={handleCustomSubmit}>
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            </Pressable>
+            <Pressable onPress={() => setShowCustomModal(false)} style={({ pressed }) => [{ marginTop: 20, opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={{ color: MM_Colors.primary, fontWeight: '600', fontSize: 17 }}>Cancel</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -349,62 +325,54 @@ export default function FocusScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: MM_Colors.background },
-  headerBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 16, marginTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10 },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logoText: { fontSize: 24, fontWeight: '900', color: MM_Colors.primary, letterSpacing: -1 },
-  headerIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.padding, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 12 },
+  logoText: { ...Typography.header },
 
-  scrollContent: { padding: 24, paddingTop: 10, flexGrow: 1, paddingBottom: 20 },
-  timerContainer: { alignItems: 'center', marginBottom: 40, marginTop: 20, position: 'relative' },
+  scrollContent: { padding: Spacing.padding, flexGrow: 1, justifyContent: 'center' },
+  timerContainer: { alignItems: 'center', marginBottom: 48 },
   glowRing: {
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: '#E9E5FF',
-    padding: 15,
-    shadowColor: MM_Colors.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10
+    width: 260,
+    height: 260,
+    borderRadius: 130,
+    backgroundColor: MM_Colors.white,
+    padding: 10,
+    ...Shadows.soft,
   },
-  innerTrack: { flex: 1, borderRadius: 125, backgroundColor: '#FFF', overflow: 'hidden', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-  progressFill: { position: 'absolute', bottom: 0, width: '100%', opacity: 0.15 },
+  innerTrack: { flex: 1, borderRadius: 120, backgroundColor: MM_Colors.white, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  progressFill: { position: 'absolute', bottom: 0, width: '100%', opacity: 0.1 },
   gradient: { flex: 1 },
   timerContent: { alignItems: 'center' },
-  timerDigits: { fontSize: 72, fontWeight: '900', color: MM_Colors.text, letterSpacing: -3 },
-  timerSubText: { fontSize: 12, fontWeight: '700', color: MM_Colors.textVariant, letterSpacing: 2, marginTop: -5 },
-  breatheText: { fontSize: 14, fontWeight: '800', color: MM_Colors.primary, letterSpacing: 3, marginTop: 10, textTransform: 'uppercase' },
+  timerDigits: { ...Typography.header, fontSize: 64, letterSpacing: -2 },
+  timerSubText: { ...Typography.caption, fontWeight: '700', letterSpacing: 1.5, marginTop: -4 },
+  breatheText: { ...Typography.body, color: MM_Colors.primary, fontWeight: '600', marginTop: 12, letterSpacing: 2 },
 
-  decorativeCircle: { position: 'absolute', top: -10, right: 30, width: 50, height: 50, borderRadius: 25, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5 },
-
-  modeToggle: { flexDirection: 'row', gap: 12, marginBottom: 32 },
-  modeBtn: { flex: 1, height: 100, borderRadius: 28, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 2, shadowColor: '#2C2A51', shadowOpacity: 0.05, shadowRadius: 10 },
+  modeToggle: { flexDirection: 'row', gap: 12, marginBottom: 40 },
+  modeBtn: { flex: 1, height: 90, borderRadius: 20, backgroundColor: MM_Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
   modeBtnActive: { backgroundColor: MM_Colors.primary },
-  modeBtnText: { fontSize: 16, fontWeight: '800', color: MM_Colors.text, marginTop: 8 },
+  modeBtnText: { ...Typography.body, fontWeight: '600', marginTop: 8 },
   textWhite: { color: '#FFF' },
 
-  presetsSection: { marginBottom: 32 },
-  sectionLabel: { fontSize: 12, fontWeight: '800', color: MM_Colors.textVariant, letterSpacing: 1, marginBottom: 12 },
+  presetsSection: { marginBottom: 40 },
+  sectionLabel: { ...Typography.caption, fontWeight: '700', marginBottom: 12 },
   presetGrid: { flexDirection: 'row', gap: 10 },
-  presetBtn: { flex: 1, height: 50, borderRadius: 15, backgroundColor: MM_Colors.white, justifyContent: 'center', alignItems: 'center', elevation: 1 },
+  presetBtn: { flex: 1, height: 44, borderRadius: 12, backgroundColor: MM_Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
   presetBtnActive: { backgroundColor: MM_Colors.primary },
-  presetBtnText: { fontWeight: '700', color: MM_Colors.text },
+  presetBtnText: { ...Typography.body, fontSize: 15, fontWeight: '600' },
   presetBtnTextActive: { color: '#FFF' },
 
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20 },
-  secondaryBtn: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', elevation: 2 },
-  mainBtn: { flex: 1, height: 72, borderRadius: 36, overflow: 'hidden', elevation: 5 },
-  mainBtnGradient: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
-  mainBtnText: { color: '#FFF', fontSize: 18, fontWeight: '900', letterSpacing: 1 },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 20 },
+  secondaryBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: MM_Colors.white, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
+  mainBtn: { flex: 1, height: 60, borderRadius: 30, overflow: 'hidden', ...Shadows.soft },
+  mainBtnGradient: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
+  mainBtnText: { color: '#FFF', fontSize: 17, fontWeight: '700', letterSpacing: 0.5 },
 
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(44, 42, 81, 0.7)', justifyContent: 'center', padding: 24 },
-  modalContent: { backgroundColor: '#FFF', borderRadius: 32, padding: 32, alignItems: 'center' },
-  modalTitle: { fontSize: 24, fontWeight: '800', color: MM_Colors.text, marginBottom: 32 },
-  inputContainer: { flexDirection: 'row', gap: 20, marginBottom: 32 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { backgroundColor: '#FFF', borderRadius: 20, padding: 24, width: '100%', alignItems: 'center', ...Shadows.soft },
+  modalTitle: { ...Typography.title, marginBottom: 24 },
+  inputContainer: { flexDirection: 'row', gap: 16, marginBottom: 32 },
   inputItem: { flex: 1, alignItems: 'center' },
-  inputLabel: { fontSize: 10, fontWeight: '800', color: MM_Colors.textVariant, marginBottom: 12 },
-  input: { backgroundColor: '#F9F5FF', width: '100%', padding: 20, borderRadius: 20, fontSize: 24, fontWeight: '800', textAlign: 'center', color: MM_Colors.text },
-  saveBtn: { backgroundColor: MM_Colors.primary, width: '100%', padding: 20, borderRadius: 24, alignItems: 'center' },
-  saveBtnText: { color: '#FFF', fontWeight: '800', fontSize: 16 },
+  inputLabel: { ...Typography.caption, fontWeight: '700', marginBottom: 8 },
+  input: { backgroundColor: MM_Colors.background, width: '100%', padding: 16, borderRadius: 12, ...Typography.header, fontSize: 32, textAlign: 'center' },
+  saveBtn: { backgroundColor: MM_Colors.primary, width: '100%', padding: 16, borderRadius: 12, alignItems: 'center' },
+  saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
 });

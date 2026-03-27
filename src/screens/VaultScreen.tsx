@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image, Alert, Modal, AppState, Dimensions, Platform, Animated, StatusBar, Linking, TextInput, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Alert, Modal, AppState, Dimensions, Platform, Animated, StatusBar, TextInput, FlatList } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
-import { Colors, Typography } from '../theme/Theme';
+import { MM_Colors, Typography, Shadows, Spacing } from '../theme/Theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
@@ -25,31 +25,13 @@ interface PasswordItem {
   pass: string;
 }
 
-const MM_Colors = {
-  primary: '#4052B6',
-  primaryLight: '#8899FF',
-  background: '#F9F5FF',
-  surface: '#FFFFFF',
-  surfaceContainer: '#E9E5FF',
-  surfaceContainerHigh: '#E3DFFF',
-  text: '#2C2A51',
-  textVariant: '#5A5781',
-  outlineVariant: '#ACA8D7',
-  onBackground: '#2C2A51',
-  onSurfaceVariant: '#5A5781',
-  primaryDim: '#3346A9',
-  secondary: '#765600',
-  error: '#B41340',
-  white: '#FFFFFF',
-};
-
 export default function VaultScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [vaultMode, setVaultMode] = useState<'primary' | 'decoy' | null>(null);
   const [hasPrimaryPin, setHasPrimaryPin] = useState<boolean | null>(null);
   const [hasDecoyPin, setHasDecoyPin] = useState<boolean | null>(null);
   const [pin, setPin] = useState('');
-  
+
   const [setupStep, setSetupStep] = useState<'none' | 'primary' | 'primary_confirm' | 'decoy' | 'decoy_confirm'>('none');
   const [tempPin, setTempPin] = useState('');
 
@@ -62,7 +44,7 @@ export default function VaultScreen() {
   const [newUser, setNewUser] = useState('');
   const [newPass, setNewPass] = useState('');
 
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [selectedItem, setSelectedItem] = useState<HiddenItem | null>(null);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [viewingMedia, setViewingMedia] = useState<HiddenItem | null>(null);
@@ -70,18 +52,15 @@ export default function VaultScreen() {
   const appState = useRef(AppState.currentState);
   const skipLock = useRef(false);
 
-  // Video Player Setup
   const videoPlayer = useVideoPlayer(viewingMedia?.type === 'video' ? viewingMedia.uri : null, (player) => {
     player.loop = true;
     player.play();
   });
 
-  // Animations
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     checkPinStatus();
-    
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (appState.current.match(/active/) && nextAppState !== 'active') {
         if (!skipLock.current) {
@@ -98,7 +77,6 @@ export default function VaultScreen() {
       }
       appState.current = nextAppState;
     });
-
     return () => subscription.remove();
   }, []);
 
@@ -115,9 +93,8 @@ export default function VaultScreen() {
       const dPin = await AsyncStorage.getItem('@vault_pin_decoy');
       setHasPrimaryPin(!!pPin);
       setHasDecoyPin(!!dPin);
-      
       if (!pPin) {
-        setIsAuthenticated(true); 
+        setIsAuthenticated(true);
         setVaultMode('primary');
       }
     } catch (e) {}
@@ -127,8 +104,8 @@ export default function VaultScreen() {
     switch (setupStep) {
       case 'primary': return 'Set Security PIN';
       case 'primary_confirm': return 'Confirm Security PIN';
-      case 'decoy': return 'Set Security PIN';
-      case 'decoy_confirm': return 'Confirm Security PIN';
+      case 'decoy': return 'Set Decoy PIN';
+      case 'decoy_confirm': return 'Confirm Decoy PIN';
       default: return 'Enter PIN';
     }
   };
@@ -144,7 +121,14 @@ export default function VaultScreen() {
          setSetupStep('none');
          setPin('');
      } else {
-         navigation.goBack();
+         skipLock.current = true;
+         // Use goBack() if Dashboard is the previous screen,
+         // or dispatch a reset to ensure Dashboard exists.
+         if (navigation.canGoBack()) {
+            navigation.goBack();
+         } else {
+            navigation.navigate('Dashboard');
+         }
      }
   };
 
@@ -158,9 +142,9 @@ export default function VaultScreen() {
   };
 
   const removePin = async () => {
-    Alert.alert("Reset All Data", "This will permanently delete all stored media and passwords and clear your PIN. Proceed?", [
+    Alert.alert("Reset Vault", "Permanently delete all secure data?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Reset Everything", style: "destructive", onPress: async () => {
+      { text: "Reset", style: "destructive", onPress: async () => {
           await AsyncStorage.removeItem('@vault_pin_primary');
           await AsyncStorage.removeItem('@vault_pin_decoy');
           await AsyncStorage.removeItem('@vault_items_primary');
@@ -172,7 +156,6 @@ export default function VaultScreen() {
           setVaultMode('primary');
           setIsAuthenticated(true);
           setIsSettingsVisible(false);
-          Alert.alert("Success", "Security and storage have been fully reset.");
       }}
     ]);
   };
@@ -209,7 +192,6 @@ export default function VaultScreen() {
     const newPin = pin + p;
     if (newPin.length > 6) return;
     setPin(newPin);
-    
     if (newPin.length === 6) {
       setTimeout(async () => {
         if (setupStep === 'primary') {
@@ -245,9 +227,8 @@ export default function VaultScreen() {
         } else {
           const savedPrimary = await AsyncStorage.getItem('@vault_pin_primary');
           const savedDecoy = await AsyncStorage.getItem('@vault_pin_decoy');
-          
           if (newPin === savedPrimary) {
-             setVaultMode('primary'); 
+             setVaultMode('primary');
              setIsAuthenticated(true);
           } else if (newPin === savedDecoy) {
              setVaultMode('decoy');
@@ -264,12 +245,11 @@ export default function VaultScreen() {
 
   const pickAndHideImage = async () => {
     if (!vaultMode) return;
-    
     skipLock.current = true;
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') {
-         Alert.alert("Permission Error", "Allow storage access to hide files.");
+         Alert.alert("Permission Required", "Allow storage access to secure files.");
          skipLock.current = false;
          return;
       }
@@ -287,18 +267,14 @@ export default function VaultScreen() {
          const fileExt = asset.uri.split('.').pop() || 'jpg';
          const newUri = `${FileSystem.documentDirectory}hidden_${vaultMode}_${Date.now()}.${fileExt}`;
          await FileSystem.copyAsync({ from: asset.uri, to: newUri });
-
          const newItem: HiddenItem = {
             id: Date.now().toString(),
             uri: newUri,
             type: asset.type === 'video' ? 'video' : 'image',
          };
          await saveHiddenItems([newItem, ...hiddenItems]);
-
          if (asset.assetId) {
-            try { 
-                await MediaLibrary.deleteAssetsAsync([asset.assetId]);
-            } catch(e) {}
+            try { await MediaLibrary.deleteAssetsAsync([asset.assetId]); } catch(e) {}
          }
       } catch (err) {}
     }
@@ -308,11 +284,10 @@ export default function VaultScreen() {
     try {
       await MediaLibrary.saveToLibraryAsync(item.uri);
       const updated = hiddenItems.filter(i => i.id !== item.id);
-      setHiddenItems(updated);
-      await AsyncStorage.setItem(`@vault_items_${vaultMode}`, JSON.stringify(updated));
+      saveHiddenItems(updated);
       setSelectedItem(null);
       setViewingMedia(null);
-      Alert.alert("Success", "File has been restored to your gallery.");
+      Alert.alert("Success", "File restored to gallery.");
     } catch(e) {
       Alert.alert("Error", "Could not restore file.");
     }
@@ -320,8 +295,7 @@ export default function VaultScreen() {
 
   const handleRemove = async (item: HiddenItem) => {
     const updated = hiddenItems.filter(i => i.id !== item.id);
-    setHiddenItems(updated);
-    await AsyncStorage.setItem(`@vault_items_${vaultMode}`, JSON.stringify(updated));
+    saveHiddenItems(updated);
     setSelectedItem(null);
     setViewingMedia(null);
   };
@@ -341,8 +315,8 @@ export default function VaultScreen() {
   };
 
   const deletePassword = (id: string) => {
-    Alert.alert("Remove Password", "Are you sure you want to delete this entry?", [
-      { text: "Cancel" },
+    Alert.alert("Delete Entry", "Remove this password?", [
+      { text: "Cancel", style: 'cancel' },
       { text: "Delete", style: 'destructive', onPress: () => savePasswords(passwords.filter(p => p.id !== id)) }
     ]);
   };
@@ -353,20 +327,10 @@ export default function VaultScreen() {
     return (
       <View style={styles.authContainer}>
         <StatusBar barStyle="dark-content" />
-        <View style={styles.bgDecoration1} />
-        <View style={styles.bgDecoration2} />
-
-        <View style={styles.authHeader}>
-          <TouchableOpacity onPress={cancelSetup} style={styles.backButton}>
-             <Ionicons name="lock-closed" size={24} color={MM_Colors.primary} />
-             <Text style={styles.headerTitle}>Secure Storage</Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.authMain}>
            <View style={styles.identityContainer}>
               <View style={styles.iconCircle}>
-                 <Ionicons name="shield-checkmark" size={40} color={MM_Colors.primary} />
+                 <Ionicons name="lock-closed-outline" size={40} color={MM_Colors.primary} />
               </View>
               <Text style={styles.authHeading}>{getAuthTitle()}</Text>
               <Text style={styles.authSubtitle}>Secure verification required</Text>
@@ -380,17 +344,19 @@ export default function VaultScreen() {
 
            <View style={styles.numpadGrid}>
               {[1,2,3,4,5,6,7,8,9].map(num => (
-                <TouchableOpacity key={num} style={styles.numpadBtn} onPress={() => handlePin(num.toString())} activeOpacity={0.6}>
+                <Pressable key={num} style={({ pressed }) => [styles.numpadBtn, { opacity: pressed ? 0.5 : 1 }]} onPress={() => handlePin(num.toString())}>
                   <Text style={styles.numpadText}>{num}</Text>
-                </TouchableOpacity>
+                </Pressable>
               ))}
-              <View style={styles.numpadBtn} />
-              <TouchableOpacity style={styles.numpadBtn} onPress={() => handlePin('0')} activeOpacity={0.6}>
+              <Pressable style={({ pressed }) => [styles.numpadBtn, { opacity: pressed ? 0.5 : 1 }]} onPress={cancelSetup}>
+                <Ionicons name="close" size={28} color={MM_Colors.textVariant} />
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.numpadBtn, { opacity: pressed ? 0.5 : 1 }]} onPress={() => handlePin('0')}>
                 <Text style={styles.numpadText}>0</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.numpadBtn} onPress={() => setPin(pin.slice(0, -1))} activeOpacity={0.6}>
-                <Ionicons name="backspace-outline" size={32} color={MM_Colors.textVariant} />
-              </TouchableOpacity>
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.numpadBtn, { opacity: pressed ? 0.5 : 1 }]} onPress={() => setPin(pin.slice(0, -1))}>
+                <Ionicons name="backspace-outline" size={28} color={MM_Colors.text} />
+              </Pressable>
            </View>
         </View>
       </View>
@@ -401,196 +367,162 @@ export default function VaultScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={28} color={MM_Colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Secure Storage</Text>
-        <TouchableOpacity onPress={() => setIsSettingsVisible(true)}>
-          <Ionicons name="settings-outline" size={28} color={MM_Colors.textVariant} />
-        </TouchableOpacity>
+        <Pressable onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Dashboard')} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+          <Ionicons name="chevron-back" size={28} color={MM_Colors.primary} />
+        </Pressable>
+        <Text style={styles.title}>Vault</Text>
+        <Pressable onPress={() => setIsSettingsVisible(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+          <Ionicons name="settings-outline" size={24} color={MM_Colors.primary} />
+        </Pressable>
       </View>
 
       <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'media' && styles.activeTab]}
+        <Pressable
           onPress={() => setActiveTab('media')}
+          style={[styles.tab, activeTab === 'media' && styles.activeTab]}
         >
           <Text style={[styles.tabText, activeTab === 'media' && styles.activeTabText]}>Media</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'passwords' && styles.activeTab]}
+        </Pressable>
+        <Pressable
           onPress={() => setActiveTab('passwords')}
+          style={[styles.tab, activeTab === 'passwords' && styles.activeTab]}
         >
           <Text style={[styles.tabText, activeTab === 'passwords' && styles.activeTabText]}>Passwords</Text>
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
       {activeTab === 'media' ? (
         <FlatList
-          key="media-grid"
           data={hiddenItems}
+          keyExtractor={(item) => item.id}
           numColumns={3}
-          keyExtractor={i => i.id}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.mediaCard}
+            <Pressable
               onPress={() => setViewingMedia(item)}
               onLongPress={() => setSelectedItem(item)}
+              style={styles.mediaItem}
             >
-              <Image source={{ uri: item.uri }} style={styles.hiddenImage} />
+              <Image source={{ uri: item.uri }} style={styles.mediaImage} />
               {item.type === 'video' && (
-                <View style={styles.videoIndicator}>
-                  <Ionicons name="play" size={16} color="#FFF" />
+                <View style={styles.videoBadge}>
+                  <Ionicons name="play" size={14} color="#FFF" />
                 </View>
               )}
-            </TouchableOpacity>
+            </Pressable>
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons name="images-outline" size={64} color={MM_Colors.surfaceContainer} />
-              <Text style={styles.emptyText}>No hidden media found.</Text>
+              <Ionicons name="images-outline" size={64} color={MM_Colors.primaryLight} />
+              <Text style={styles.emptyTitle}>Vault is Empty</Text>
+              <Text style={styles.emptySubtitle}>Secure your private photos and videos here.</Text>
             </View>
           }
         />
       ) : (
         <FlatList
-          key="password-list"
           data={passwords}
-          numColumns={1}
-          keyExtractor={i => i.id}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
           renderItem={({ item }) => (
-            <View style={styles.passCard}>
-              <View style={{ flex: 1 }}>
+            <Pressable
+              onLongPress={() => deletePassword(item.id)}
+              style={styles.passItem}
+            >
+              <View style={styles.passIcon}>
+                <Ionicons name="key-outline" size={20} color={MM_Colors.primary} />
+              </View>
+              <View style={styles.passInfo}>
                 <Text style={styles.passSite}>{item.site}</Text>
                 <Text style={styles.passUser}>{item.username}</Text>
               </View>
-              <TouchableOpacity onPress={() => {
-                Alert.alert("Entry Details", `Site: ${item.site}\nUser: ${item.username}\nPass: ${item.pass}`, [{ text: "Copy Pass", onPress: () => {} }, { text: "Close" }]);
-              }}>
-                <Ionicons name="eye-outline" size={24} color={MM_Colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => deletePassword(item.id)} style={{ marginLeft: 15 }}>
-                <Ionicons name="trash-outline" size={24} color={MM_Colors.error} />
-              </TouchableOpacity>
-            </View>
+              <Pressable onPress={() => Alert.alert("Password", item.pass)}>
+                <Ionicons name="eye-outline" size={20} color={MM_Colors.textVariant} />
+              </Pressable>
+            </Pressable>
           )}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons name="key-outline" size={64} color={MM_Colors.surfaceContainer} />
-              <Text style={styles.emptyText}>No stored passwords found.</Text>
+              <Ionicons name="shield-checkmark-outline" size={64} color={MM_Colors.primaryLight} />
+              <Text style={styles.emptyTitle}>No Passwords</Text>
+              <Text style={styles.emptySubtitle}>Store your login credentials safely.</Text>
             </View>
           }
         />
       )}
 
-      <TouchableOpacity
+      <Pressable
         style={styles.fab}
         onPress={() => activeTab === 'media' ? pickAndHideImage() : setIsPassModalVisible(true)}
       >
-        <LinearGradient colors={[MM_Colors.primary, MM_Colors.primaryLight]} style={styles.fabInner}>
-           <Ionicons name="add" size={32} color={MM_Colors.white} />
-        </LinearGradient>
-      </TouchableOpacity>
+        <Ionicons name="add" size={30} color="#FFF" />
+      </Pressable>
 
-      {/* Media Fullscreen Viewer */}
-      <Modal visible={!!viewingMedia} transparent animationType="fade">
-        <View style={styles.fullscreenOverlay}>
-          <TouchableOpacity style={styles.closeFullscreen} onPress={() => setViewingMedia(null)}>
-            <Ionicons name="close" size={32} color="#FFF" />
-          </TouchableOpacity>
-          {viewingMedia && (
-            viewingMedia.type === 'video' ? (
-              <VideoView
-                style={styles.fullscreenVideo}
-                player={videoPlayer}
-                allowsFullscreen
-                allowsPictureInPicture
-              />
-            ) : (
-              <Image source={{ uri: viewingMedia.uri }} style={styles.fullscreenImage} resizeMode="contain" />
-            )
-          )}
-          <View style={styles.fullscreenFooter}>
-            <TouchableOpacity style={styles.fullscreenBtn} onPress={() => handleUnhide(viewingMedia!)}>
-              <Ionicons name="eye-outline" size={24} color="#FFF" />
-              <Text style={styles.fullscreenBtnText}>Unhide</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.fullscreenBtn} onPress={() => handleRemove(viewingMedia!)}>
-              <Ionicons name="trash-outline" size={24} color={MM_Colors.error} />
-              <Text style={[styles.fullscreenBtnText, { color: MM_Colors.error }]}>Remove</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Options Modal */}
-      <Modal visible={!!selectedItem} transparent animationType="fade">
+      <Modal visible={isSettingsVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-             <Ionicons name="image" size={40} color={MM_Colors.primary} style={{marginBottom: 10}} />
-             <Text style={styles.modalTitle}>File Options</Text>
-             <TouchableOpacity style={styles.actionBtn} onPress={() => handleUnhide(selectedItem!)}>
-                <Ionicons name="eye-outline" size={24} color={MM_Colors.text} style={{marginRight: 10}} />
-                <Text style={styles.actionText}>Restore to Gallery</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={[styles.actionBtn, {backgroundColor: MM_Colors.error + '20'}]} onPress={() => handleRemove(selectedItem!)}>
-                <Ionicons name="trash-outline" size={24} color={MM_Colors.error} style={{marginRight: 10}} />
-                <Text style={[styles.actionText, {color: MM_Colors.error}]}>Remove Permanently</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={{marginTop: 15}} onPress={() => setSelectedItem(null)}>
-                <Text style={{color: MM_Colors.textVariant, fontWeight: 'bold'}}>CANCEL</Text>
-             </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Password Modal */}
-      <Modal visible={isPassModalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>New Entry</Text>
-            <TextInput style={styles.input} placeholder="Website/App" placeholderTextColor={MM_Colors.textVariant} value={newSite} onChangeText={setNewSite} />
-            <TextInput style={styles.input} placeholder="Username/Email" placeholderTextColor={MM_Colors.textVariant} value={newUser} onChangeText={setNewUser} />
-            <TextInput style={styles.input} placeholder="Password" placeholderTextColor={MM_Colors.textVariant} secureTextEntry value={newPass} onChangeText={setNewPass} />
-            <View style={styles.modalActions}>
-              <TouchableOpacity onPress={() => setIsPassModalVisible(false)} style={styles.cancelBtn}><Text style={{fontWeight:'700'}}>Cancel</Text></TouchableOpacity>
-              <TouchableOpacity onPress={addPassword} style={styles.saveBtn}><Text style={{color: '#FFF', fontWeight:'700'}}>Save</Text></TouchableOpacity>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Vault Settings</Text>
+              <Pressable onPress={() => setIsSettingsVisible(false)}>
+                <Ionicons name="close" size={24} color={MM_Colors.text} />
+              </Pressable>
             </View>
+            <Pressable style={styles.settingRow} onPress={() => { setIsSettingsVisible(false); startSetup(); }}>
+              <Ionicons name="lock-open-outline" size={22} color={MM_Colors.text} />
+              <Text style={styles.settingLabel}>Change PIN</Text>
+            </Pressable>
+            {!hasDecoyPin && (
+              <Pressable style={styles.settingRow} onPress={() => { setIsSettingsVisible(false); setSetupStep('decoy'); setIsAuthenticated(false); }}>
+                <Ionicons name="eye-off-outline" size={22} color={MM_Colors.text} />
+                <Text style={styles.settingLabel}>Setup Decoy Mode</Text>
+              </Pressable>
+            )}
+            <Pressable style={styles.settingRow} onPress={removePin}>
+              <Ionicons name="trash-outline" size={22} color={MM_Colors.error} />
+              <Text style={[styles.settingLabel, { color: MM_Colors.error }]}>Reset Vault</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
 
-      {/* Settings Modal */}
-      <Modal visible={isSettingsVisible} transparent animationType="slide">
+      <Modal visible={!!viewingMedia} animationType="fade" statusBarTranslucent>
+        <View style={styles.viewerContainer}>
+          <Pressable style={styles.viewerClose} onPress={() => setViewingMedia(null)}>
+            <Ionicons name="close" size={30} color="#FFF" />
+          </Pressable>
+          {viewingMedia?.type === 'video' ? (
+             <VideoView style={styles.fullMedia} player={videoPlayer} allowsFullscreen allowsPictureInPicture />
+          ) : (
+            <Image source={{ uri: viewingMedia?.uri }} style={styles.fullMedia} resizeMode="contain" />
+          )}
+          <View style={styles.viewerActions}>
+            <Pressable style={styles.viewerBtn} onPress={() => handleUnhide(viewingMedia!)}>
+               <Ionicons name="download-outline" size={24} color="#FFF" />
+               <Text style={styles.viewerBtnText}>Restore</Text>
+            </Pressable>
+            <Pressable style={styles.viewerBtn} onPress={() => handleRemove(viewingMedia!)}>
+               <Ionicons name="trash-outline" size={24} color="#FF4B4B" />
+               <Text style={[styles.viewerBtnText, { color: '#FF4B4B' }]}>Delete</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={isPassModalVisible} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-             <Text style={styles.modalTitle}>Security Configuration</Text>
-             {vaultMode === 'primary' ? (
-               <>
-                 <TouchableOpacity style={styles.actionBtn} onPress={() => {setIsSettingsVisible(false); setSetupStep('primary');}}>
-                    <Ionicons name="key-outline" size={24} color={MM_Colors.text} style={{marginRight: 10}} />
-                    <Text style={styles.actionText}>Change Primary PIN</Text>
-                 </TouchableOpacity>
-                 <TouchableOpacity style={styles.actionBtn} onPress={() => {setIsSettingsVisible(false); setSetupStep('decoy');}}>
-                    <Ionicons name="shield-outline" size={24} color={MM_Colors.text} style={{marginRight: 10}} />
-                    <Text style={styles.actionText}>{hasDecoyPin ? 'Change Decoy PIN' : 'Initialize Decoy PIN'}</Text>
-                 </TouchableOpacity>
-               </>
-             ) : (
-               <TouchableOpacity style={styles.actionBtn} onPress={() => {setIsSettingsVisible(false); setSetupStep('decoy');}}>
-                  <Ionicons name="key-outline" size={24} color={MM_Colors.text} style={{marginRight: 10}} />
-                  <Text style={styles.actionText}>Change Password</Text>
-               </TouchableOpacity>
-             )}
-             <TouchableOpacity style={[styles.actionBtn, {backgroundColor: MM_Colors.error + '20'}]} onPress={removePin}>
-                <Ionicons name="lock-open-outline" size={24} color={MM_Colors.error} style={{marginRight: 10}} />
-                <Text style={[styles.actionText, {color: MM_Colors.error}]}>Factory Reset (Clear All)</Text>
-             </TouchableOpacity>
-             <TouchableOpacity style={{marginTop: 15}} onPress={() => setIsSettingsVisible(false)}>
-                <Text style={{color: MM_Colors.textVariant, fontWeight: '700'}}>CLOSE</Text>
-             </TouchableOpacity>
+          <View style={styles.passModal}>
+             <Text style={styles.passModalTitle}>Add Password</Text>
+             <TextInput placeholder="Website / App" style={styles.input} value={newSite} onChangeText={setNewSite} placeholderTextColor={MM_Colors.textVariant} />
+             <TextInput placeholder="Username" style={styles.input} value={newUser} onChangeText={setNewUser} autoCapitalize="none" placeholderTextColor={MM_Colors.textVariant} />
+             <TextInput placeholder="Password" style={styles.input} value={newPass} onChangeText={setNewPass} secureTextEntry placeholderTextColor={MM_Colors.textVariant} />
+             <View style={styles.modalBtns}>
+                <Pressable onPress={() => setIsPassModalVisible(false)} style={styles.cancelBtn}>
+                   <Text style={styles.cancelBtnText}>Cancel</Text>
+                </Pressable>
+                <Pressable onPress={addPassword} style={styles.saveBtn}>
+                   <Text style={styles.saveBtnText}>Save</Text>
+                </Pressable>
+             </View>
           </View>
         </View>
       </Modal>
@@ -599,57 +531,65 @@ export default function VaultScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: MM_Colors.background },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 20,
+    backgroundColor: '#FFF',
+  },
+  title: { ...Typography.h2, color: MM_Colors.text },
+  tabContainer: { flexDirection: 'row', padding: 20, gap: 15 },
+  tab: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, backgroundColor: '#F0EFFF' },
+  activeTab: { backgroundColor: MM_Colors.primary },
+  tabText: { fontWeight: '600', color: MM_Colors.textVariant },
+  activeTabText: { color: '#FFF' },
+  listContent: { paddingHorizontal: 15, paddingBottom: 100 },
+  mediaItem: { width: (width - 40) / 3, height: (width - 40) / 3, margin: 2, borderRadius: 8, overflow: 'hidden', backgroundColor: '#E9E5FF' },
+  mediaImage: { width: '100%', height: '100%' },
+  videoBadge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(0,0,0,0.5)', padding: 4, borderRadius: 10 },
+  passItem: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFF', borderRadius: 16, marginBottom: 10, ...Shadows.small },
+  passIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#F0EFFF', alignItems: 'center', justifyContent: 'center', marginRight: 15 },
+  passInfo: { flex: 1 },
+  passSite: { fontSize: 16, fontWeight: '700', color: MM_Colors.text },
+  passUser: { fontSize: 13, color: MM_Colors.textVariant, marginTop: 2 },
+  fab: { position: 'absolute', bottom: 30, right: 30, width: 60, height: 60, borderRadius: 30, backgroundColor: MM_Colors.primary, alignItems: 'center', justifyContent: 'center', ...Shadows.medium },
+  emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 100, paddingHorizontal: 40 },
+  emptyTitle: { fontSize: 20, fontWeight: '800', color: MM_Colors.text, marginTop: 20 },
+  emptySubtitle: { textAlign: 'center', color: MM_Colors.textVariant, marginTop: 10, lineHeight: 20 },
   authContainer: { flex: 1, backgroundColor: MM_Colors.background },
-  bgDecoration1: { position: 'absolute', top: -height * 0.1, left: -width * 0.1, width: width * 0.4, height: width * 0.4, borderRadius: width * 0.2, backgroundColor: 'rgba(64, 82, 182, 0.05)' },
-  bgDecoration2: { position: 'absolute', bottom: -height * 0.1, right: -width * 0.1, width: width * 0.5, height: width * 0.5, borderRadius: width * 0.25, backgroundColor: 'rgba(118, 86, 0, 0.05)' },
-  authHeader: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 16, marginTop: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 10 },
-  backButton: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerTitle: { fontWeight: '800', fontSize: 20, color: MM_Colors.primary, letterSpacing: -0.5 },
-  authMain: { flex: 1, width: '100%', paddingHorizontal: 32, alignItems: 'center', justifyContent: 'center' },
-  identityContainer: { alignItems: 'center', marginBottom: 48 },
-  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: MM_Colors.surfaceContainerHigh, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  authHeading: { fontWeight: '800', fontSize: 32, color: MM_Colors.onBackground, letterSpacing: -0.5, marginBottom: 8, textAlign: 'center' },
-  authSubtitle: { color: MM_Colors.onSurfaceVariant, fontWeight: '500', fontSize: 14, textAlign: 'center' },
-  pinDisplay: { flexDirection: 'row', gap: 24, paddingVertical: 16, marginBottom: 48 },
-  pinDot: { width: 16, height: 16, borderRadius: 8, backgroundColor: MM_Colors.outlineVariant },
-  pinDotActive: { backgroundColor: MM_Colors.primary, transform: [{ scale: 1.2 }], shadowColor: MM_Colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 12 },
-  numpadGrid: { width: '100%', maxWidth: 320, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 24 },
-  numpadBtn: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  numpadText: { fontWeight: '700', fontSize: 26, color: MM_Colors.text },
-
-  container: { flex: 1, backgroundColor: MM_Colors.background, padding: 24, paddingTop: Platform.OS === 'ios' ? 80 : (StatusBar.currentHeight || 0) + 30 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 },
-  title: { fontSize: 28, fontWeight: '900', color: MM_Colors.primary, letterSpacing: -1 },
-  tabContainer: { flexDirection: 'row', backgroundColor: MM_Colors.surfaceContainer, borderRadius: 12, padding: 4, marginBottom: 20 },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 8 },
-  activeTab: { backgroundColor: MM_Colors.white, elevation: 2 },
-  tabText: { fontWeight: '700', color: MM_Colors.textVariant },
-  activeTabText: { color: MM_Colors.primary },
-  mediaCard: { flex: 1/3, aspectRatio: 1, margin: 4, borderRadius: 12, overflow: 'hidden', backgroundColor: MM_Colors.surface },
-  hiddenImage: { width: '100%', height: '100%' },
-  videoIndicator: { position: 'absolute', top: 5, right: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 2 },
-  passCard: { backgroundColor: MM_Colors.white, padding: 16, borderRadius: 16, flexDirection: 'row', alignItems: 'center', marginBottom: 12, elevation: 1 },
-  passSite: { fontSize: 18, fontWeight: '800', color: MM_Colors.text },
-  passUser: { fontSize: 14, color: MM_Colors.textVariant },
-  emptyState: { alignItems: 'center', marginTop: 100, opacity: 0.5 },
-  emptyText: { marginTop: 16, color: MM_Colors.textVariant, fontWeight: '600' },
-  fab: { position: 'absolute', bottom: 30, right: 30, elevation: 8, shadowColor: MM_Colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 15 },
-  fabInner: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(44, 42, 81, 0.8)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalContent: { backgroundColor: MM_Colors.surface, padding: 32, borderRadius: 32, width: '100%', alignItems: 'center' },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: MM_Colors.text, marginBottom: 24 },
-  input: { backgroundColor: MM_Colors.background, width: '100%', padding: 15, borderRadius: 12, marginBottom: 12, color: MM_Colors.text, fontWeight: '600' },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  cancelBtn: { padding: 15, borderRadius: 12, backgroundColor: MM_Colors.background, flex: 1, alignItems: 'center' },
-  saveBtn: { padding: 15, borderRadius: 12, backgroundColor: MM_Colors.primary, flex: 1, alignItems: 'center' },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: MM_Colors.background, width: '100%', padding: 20, borderRadius: 20, marginBottom: 12 },
-  actionText: { fontSize: 16, fontWeight: '700', color: MM_Colors.text },
-
-  fullscreenOverlay: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  fullscreenImage: { width: width, height: height * 0.8 },
-  fullscreenVideo: { width: width, height: height * 0.8 },
-  closeFullscreen: { position: 'absolute', top: 60, right: 24, zIndex: 10 },
-  fullscreenFooter: { position: 'absolute', bottom: 40, width: '100%', flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 40 },
-  fullscreenBtn: { alignItems: 'center', gap: 8 },
-  fullscreenBtnText: { color: '#FFF', fontWeight: '700', fontSize: 12 }
+  authMain: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 30 },
+  identityContainer: { alignItems: 'center', marginBottom: 40 },
+  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', ...Shadows.medium, marginBottom: 20 },
+  authHeading: { fontSize: 24, fontWeight: '800', color: MM_Colors.text },
+  authSubtitle: { fontSize: 15, color: MM_Colors.textVariant, marginTop: 5 },
+  pinDisplay: { flexDirection: 'row', gap: 15, marginBottom: 50 },
+  pinDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: MM_Colors.primaryLight },
+  pinDotActive: { backgroundColor: MM_Colors.primary, borderColor: MM_Colors.primary },
+  numpadGrid: { flexDirection: 'row', flexWrap: 'wrap', width: 280, justifyContent: 'center', gap: 20 },
+  numpadBtn: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center', ...Shadows.small },
+  numpadText: { fontSize: 28, fontWeight: '600', color: MM_Colors.text },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalSheet: { backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 30, paddingBottom: 50 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: MM_Colors.text },
+  settingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, gap: 15 },
+  settingLabel: { fontSize: 16, fontWeight: '600', color: MM_Colors.text },
+  viewerContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center' },
+  viewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 10 },
+  fullMedia: { width: '100%', height: '70%' },
+  viewerActions: { flexDirection: 'row', justifyContent: 'center', gap: 40, marginTop: 40 },
+  viewerBtn: { alignItems: 'center' },
+  viewerBtnText: { color: '#FFF', fontSize: 12, marginTop: 8, fontWeight: '600' },
+  passModal: { backgroundColor: '#FFF', margin: 30, borderRadius: 24, padding: 25, ...Shadows.medium },
+  passModalTitle: { fontSize: 18, fontWeight: '800', color: MM_Colors.text, marginBottom: 20 },
+  input: { height: 50, backgroundColor: '#F9F5FF', borderRadius: 12, paddingHorizontal: 15, marginBottom: 15, color: MM_Colors.text },
+  modalBtns: { flexDirection: 'row', gap: 10, marginTop: 5 },
+  cancelBtn: { flex: 1, height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F5F5F5' },
+  saveBtn: { flex: 1, height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: MM_Colors.primary },
+  cancelBtnText: { fontWeight: '700', color: MM_Colors.textVariant },
+  saveBtnText: { fontWeight: '700', color: '#FFF' },
 });
