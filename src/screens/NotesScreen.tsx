@@ -115,20 +115,6 @@ export default function NotesScreen() {
     ]).start();
   };
 
-  const handleForgotPin = async () => {
-    const url = 'mailto:anand.aage.spam@gmail.com?subject=Security PIN Reset Request&body=I have forgotten my journal PIN. Please provide instructions to reset my access.';
-    const supported = await Linking.canOpenURL(url);
-    if (supported) {
-      await Linking.openURL(url);
-    } else {
-      Alert.alert(
-        "Reset Access",
-        "Please email anand.aage.spam@gmail.com from your registered address to reset your PIN.",
-        [{ text: "OK" }]
-      );
-    }
-  };
-
   const handlePin = async (p: string) => {
     const newPin = pin + p;
     if (newPin.length > 6) return;
@@ -285,13 +271,7 @@ export default function NotesScreen() {
         <View style={styles.bgDecoration2} />
 
         <View style={styles.authHeader}>
-          <TouchableOpacity onPress={cancelSetup} style={styles.headerLeft}>
-            <MaterialIcons name="lock" size={24} color={MM_Colors.primary} />
-            <Text style={styles.headerTitle}>Secure Journal</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setIsSettingsVisible(true)}>
-            <MaterialIcons name="settings" size={24} color={MM_Colors.slate500} />
-          </TouchableOpacity>
+
         </View>
 
         <View style={styles.authMain}>
@@ -340,9 +320,7 @@ export default function NotesScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.forgotLink} onPress={handleForgotPin}>
-            <Text style={styles.forgotLinkText}>FORGOT PIN?</Text>
-          </TouchableOpacity>
+
         </View>
       </View>
     );

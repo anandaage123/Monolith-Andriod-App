@@ -16,8 +16,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#1E1E2C",
-        "foregroundImage": "./assets/android-icon-foreground.png"
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/icon.png"
       },
       "package": "com.anandaage.dailyapp"
     },

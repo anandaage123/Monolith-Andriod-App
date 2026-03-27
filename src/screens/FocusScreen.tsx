@@ -39,7 +39,7 @@ const MM_Colors = {
 };
 
 const PRESET_WORK = [15, 25, 45, 60];
-const PRESET_BREAK = [5, 10, 15];
+const PRESET_BREAK = [5, 10, 15, 30];
 
 export default function FocusScreen() {
   const navigation = useNavigation<NavigationProp<any>>();

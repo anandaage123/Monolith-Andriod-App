@@ -48,7 +48,7 @@ function TabNavigator() {
             iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Focus') {
             iconName = focused ? 'timer' : 'timer-outline';
-          } else if (route.name === 'Notes') {
+          } else if (route.name === 'Journal') {
             iconName = focused ? 'book' : 'book-outline';
           }
           return <Ionicons name={iconName} size={size > 28 ? 28 : size} color={color} />;
@@ -64,7 +64,7 @@ function TabNavigator() {
       <Tab.Screen name="Tasks" component={TodosScreen} />
       <Tab.Screen name="Budget" component={BudgetScreen} />
       <Tab.Screen name="Focus" component={FocusScreen} />
-      <Tab.Screen name="Notes" component={NotesScreen} />
+      <Tab.Screen name="Journal" component={NotesScreen} />
     </Tab.Navigator>
   );
 }
