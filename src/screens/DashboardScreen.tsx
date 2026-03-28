@@ -133,9 +133,32 @@ export default function DashboardScreen() {
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
     modalContent: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, width: '100%', ...Shadows.soft },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-    modalTitle: { ...Typography.title, color: colors.text },
-    label: { ...Typography.caption, fontWeight: '700', marginBottom: 12, marginTop: 12 },
-    input: { borderBottomWidth: 1, borderBottomColor: colors.surfaceContainer, color: colors.text, paddingVertical: 8, ...Typography.body, marginBottom: 24 },
+    modalTitle: {
+      fontFamily: Typography.title.fontFamily,
+      fontSize: Typography.title.fontSize,
+      fontWeight: Typography.title.fontWeight,
+      letterSpacing: Typography.title.letterSpacing,
+      color: colors.text
+    },
+    label: {
+      fontFamily: Typography.caption.fontFamily,
+      fontSize: Typography.caption.fontSize,
+      letterSpacing: Typography.caption.letterSpacing,
+      fontWeight: '700',
+      marginBottom: 12,
+      marginTop: 12,
+      color: colors.textVariant
+    },
+    input: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.surfaceContainer,
+      color: colors.text,
+      paddingVertical: 8,
+      fontFamily: Typography.body.fontFamily,
+      fontSize: Typography.body.fontSize,
+      lineHeight: Typography.body.lineHeight,
+      marginBottom: 24
+    },
     iconPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
     iconBox: { width: 44, height: 44, borderRadius: 10, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
     iconBoxSelected: { backgroundColor: colors.primary },
@@ -443,16 +466,16 @@ export default function DashboardScreen() {
               >
                 <Text style={styles.logoText}>Daily Hub</Text>
               </Pressable>
-              
+
               <View style={{ flexDirection: 'row', gap: 12 }}>
-                <Pressable 
+                <Pressable
                   onPress={() => setThemeMode(isDark ? 'light' : 'dark')}
                   style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.7 : 1 }]}
                 >
                   <Ionicons name={isDark ? "sunny" : "moon"} size={22} color={colors.primary} />
                 </Pressable>
                 <View style={styles.headerBtn}>
-                   <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+                  <Ionicons name="notifications-outline" size={22} color={colors.primary} />
                 </View>
               </View>
             </View>
@@ -489,7 +512,7 @@ export default function DashboardScreen() {
         {renderAnimatedSection(2, (
           <View style={styles.ritualsContainer}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Rituals</Text>
+              <Text style={styles.sectionTitle}>Daily Habits</Text>
               <Text style={styles.sectionBadge}>{habits.filter(h => h.completed).length}/{habits.length} DONE</Text>
             </View>
             <View style={styles.habitsGrid}>

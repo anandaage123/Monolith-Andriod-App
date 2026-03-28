@@ -20,11 +20,9 @@ import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
-import * as FileSystem from 'expo-file-system';
-const cacheDirectory = (FileSystem as any).cacheDirectory;
-const writeAsStringAsync = (FileSystem as any).writeAsStringAsync;
-import * as Haptics from 'expo-haptics';
+import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Typography, Shadows, Spacing } from '../theme/Theme';
 import { useTheme } from '../context/ThemeContext';
@@ -367,7 +365,8 @@ export default function NotesScreen() {
       }
       setIsSettingsVisible(false);
     } catch (e) {
-      Alert.alert("Export Failed", "Could not generate the export file.");
+      console.warn('Export error:', e);
+      Alert.alert("Export Failed", "Could not generate the export file. Check storage permissions.");
     }
   };
 
@@ -479,7 +478,7 @@ export default function NotesScreen() {
     <View style={styles.mainContainer}>
       {/* Background Gradient */}
       <LinearGradient 
-        colors={['#FDFCFF', '#F9F5FF']} 
+        colors={isDark ? [colors.background, '#1A1826'] : ['#FDFCFF', '#F9F5FF']} 
         style={StyleSheet.absoluteFill} 
       />
 
@@ -621,8 +620,8 @@ export default function NotesScreen() {
         transparent={false}
         statusBarTranslucent
       >
-        <View style={{flex: 1, backgroundColor: '#FFF'}}>
-           <View style={styles.headerRow}>
+        <View style={{flex: 1, backgroundColor: colors.background}}>
+           <View style={styles.editorHeader}>
               <TouchableOpacity onPress={() => { setIsEditing(false); setIsViewing(false); }}>
                  <Text style={styles.navText}>Cancel</Text>
               </TouchableOpacity>
@@ -711,7 +710,7 @@ export default function NotesScreen() {
                         style={[styles.actionRow, {marginTop: 40, borderBottomWidth: 0}]}
                         onPress={() => { setNoteToDelete(currentNote.id!); setIsDeleteModalVisible(true); }}
                      >
-                        <View style={[styles.actionIconBg, {backgroundColor: '#FFF2F5'}]}>
+                       <View style={[styles.actionIconBg, {backgroundColor: colors.error + '15'}]}>
                            <Ionicons name="trash-outline" size={20} color={colors.error} />
                         </View>
                         <Text style={[styles.actionTextMain, {color: colors.error}]}>Delete Entry</Text>
@@ -743,7 +742,7 @@ export default function NotesScreen() {
                </Pressable>
 
                <Pressable style={styles.actionRow} onPress={startSetup}>
-                  <View style={[styles.actionIconBg, {backgroundColor: '#F7F7F9'}]}>
+                  <View style={[styles.actionIconBg, {backgroundColor: colors.surfaceContainer}]}>
                     <Ionicons name="key-outline" size={20} color={colors.text} />
                   </View>
                   <View style={{flex: 1, paddingLeft: 12}}>
