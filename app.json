@@ -2,7 +2,7 @@
   "expo": {
     "name": "Monolith",
     "slug": "daily-app",
-    "version": "2.2.3",
+    "version": "2.3.0",
     "orientation": "portrait",
     "icon": "./assets/AppIcons/appstore.png",
     "userInterfaceStyle": "dark",
@@ -21,14 +21,15 @@
         "foregroundImage": "./assets/AppIcons/playstore.png"
       },
       "package": "com.anandaage.dailyapp",
-      "versionCode": 10
+      "versionCode": 11
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-audio",
-      "expo-video"
+      "expo-video",
+      "expo-sharing"
     ]
   }
 }

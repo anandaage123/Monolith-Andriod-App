@@ -1,11 +1,11 @@
 {
-  "version": "2.2.3",
-  "build": 10,
-  "versionCode": 10,
+  "version": "2.3.0",
+  "build": 11,
+  "versionCode": 11,
   "releaseDate": "2026-03-28",
-  "releaseNotes": "\u2022 Fixed keyboard jitter on Android\n\u2022 Improved Budget Modal transitions\n\u2022 Internal stability fixes",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v2.2.3/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v2.2.3",
+  "releaseNotes": "\u2022 Modernized Journal UI with premium aesthetics\nHaptic feedback on PIN entry and interactions\nExport Musings feature (.txt export & sharing)\nFixed layout jitter on Android keyboard focus\nSynced versioning for system settings",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v2.3.0/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v2.3.0",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
