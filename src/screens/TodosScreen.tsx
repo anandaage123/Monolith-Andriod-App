@@ -201,7 +201,7 @@ export default function TodosScreen() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="notebook-outline" size={64} color={MM_Colors.surfaceContainer} />
-            <Text style={styles.emptyText}>The Muse is quiet. Add a task to begin.</Text>
+            <Text style={styles.emptyText}>The day is quiet. Add a task to begin.</Text>
           </View>
         }
         ListFooterComponent={<View style={{ height: 100 }} />}

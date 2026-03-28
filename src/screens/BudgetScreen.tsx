@@ -371,8 +371,11 @@ export default function BudgetScreen() {
       </Modal>
 
       {/* Add Transaction Modal */}
-      <Modal visible={isAdding} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+      <Modal visible={isAdding} transparent animationType="slide" statusBarTranslucent>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+          style={styles.modalOverlay}
+        >
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsAdding(false)} />
           <View style={styles.addSheet}>
             <View style={styles.sheetIndicator} />

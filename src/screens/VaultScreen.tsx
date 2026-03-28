@@ -14,15 +14,11 @@ import { MM_Colors, Typography, Shadows, Spacing } from '../theme/Theme';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useVideoPlayer, VideoView } from 'expo-video';
-// expo-haptics — import with a fallback so it doesn't crash if not installed
-let Haptics: any = null;
-try { Haptics = require('expo-haptics'); } catch (e) {}
+import * as ScreenCapture from 'expo-screen-capture';
+import * as Haptics from 'expo-haptics';
 const hapticImpact = (style: 'Light' | 'Medium' | 'Heavy' = 'Light') => {
-  try { Haptics?.impactAsync(Haptics?.ImpactFeedbackStyle?.[style]); } catch (e) {}
+  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle[style]); } catch (e) {}
 };
-// expo-screen-capture for screenshot protection
-let ScreenCapture: any = null;
-try { ScreenCapture = require('expo-screen-capture'); } catch (e) {}
 
 const { width, height } = Dimensions.get('window');
 
@@ -443,9 +439,11 @@ export default function VaultScreen() {
     AsyncStorage.getItem('@vault_last_tab').then(t => {
       if (t === 'media' || t === 'passwords' || t === 'albums') setActiveTab(t as any);
     }).catch(() => {});
+    // App drawer privacy & auto-lock
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (appState.current === 'active' && nextAppState !== 'active') {
-        if (!skipLock.current) lockVault();
+        // LOCK IMMEDIATELY when user exits (presses home, switches app, or drawer)
+        lockVault();
       }
       appState.current = nextAppState;
     });
@@ -936,7 +934,10 @@ export default function VaultScreen() {
   };
 
   const savePasswordEntry = () => {
-    if (!newSite.trim()) return;
+    if (!newSite.trim()) {
+      Alert.alert('Incomplete Entry', 'Please provide a site name or service for this password.');
+      return;
+    }
 
     if (!editingPassword && checkDuplicatePassword(newSite.trim())) {
       Alert.alert(

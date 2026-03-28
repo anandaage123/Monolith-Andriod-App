@@ -72,7 +72,7 @@ export default function DashboardScreen() {
   // Weather & Quote State
   const [weather, setWeather] = useState<{ temp: number, desc: string, icon: any, status: string } | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
-  const [quote, setQuote] = useState({ text: "Crafting your morning inspiration...", author: "Methodic Muse" });
+  const [quote, setQuote] = useState({ text: "Crafting your morning inspiration...", author: "Daily Hub" });
   const [budgetHealth, setBudgetHealth] = useState({ label: 'Calculating...', percentage: 0, status: 'Normal' });
 
   // Choreographed Animation Values
@@ -359,7 +359,7 @@ export default function DashboardScreen() {
                 delayLongPress={2000}
                 style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
               >
-                <Text style={styles.logoText}>Methodic Muse</Text>
+                <Text style={styles.logoText}>Daily Hub</Text>
               </Pressable>
             </View>
 
