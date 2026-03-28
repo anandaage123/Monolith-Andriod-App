@@ -69,7 +69,7 @@ export default function DashboardScreen() {
   const [isReady, setIsReady] = useState(false);
 
   // Weather & Quote State
-  const [weather, setWeather] = useState<{temp: number, desc: string, icon: any, status: string} | null>(null);
+  const [weather, setWeather] = useState<{ temp: number, desc: string, icon: any, status: string } | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
   const [quote, setQuote] = useState({ text: "Crafting your morning inspiration...", author: "Methodic Muse" });
   const [budgetHealth, setBudgetHealth] = useState({ label: 'Calculating...', percentage: 0, status: 'Normal' });
@@ -158,7 +158,7 @@ export default function DashboardScreen() {
     try {
       const stored = await AsyncStorage.getItem('@habits_v3');
       if (stored) setHabits(JSON.parse(stored));
-    } catch(e) {}
+    } catch (e) { }
   };
 
   const loadBudgetMetrics = async () => {
@@ -181,7 +181,7 @@ export default function DashboardScreen() {
         percentage: percentage,
         status: status
       });
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const backgroundQuoteUpdate = async () => {
@@ -191,7 +191,7 @@ export default function DashboardScreen() {
       const newQuote = { text: data.quote, author: data.author };
       setQuote(newQuote);
       await AsyncStorage.setItem('@quote_cache', JSON.stringify(newQuote));
-    } catch (error) {}
+    } catch (error) { }
   };
 
   const fetchNewQuote = async (direction: 'left' | 'right' = 'right') => {
@@ -299,9 +299,9 @@ export default function DashboardScreen() {
   };
 
   const deleteHabit = (id: string) => {
-      const updated = habits.filter(h => h.id !== id);
-      setHabits(updated);
-      AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+    const updated = habits.filter(h => h.id !== id);
+    setHabits(updated);
+    AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
   };
 
   const addHabit = () => {
@@ -364,13 +364,13 @@ export default function DashboardScreen() {
 
             <View style={styles.greetingSection}>
               <Text style={styles.dateLabel}>{today}</Text>
-              <Text style={styles.greetingTitle}>Rise & Execute..</Text>
+              <Text style={styles.greetingTitle}>Rise & Execute.</Text>
               <Text style={styles.greetingSub}>
                 {habits.filter(h => h.completed).length > 0
                   ? `${habits.filter(h => h.completed).length} of ${habits.length} rituals crushed today. Keep the streak alive.`
                   : habits.length > 0
-                  ? `${habits.length} rituals await. Start strong.`
-                  : 'Add your first ritual and build momentum.'}
+                    ? `${habits.length} rituals await. Start strong.`
+                    : 'Add your first ritual and build momentum.'}
               </Text>
             </View>
           </View>
@@ -440,15 +440,15 @@ export default function DashboardScreen() {
             <View style={styles.weatherContent}>
               {isWeatherLoading && !weather ? (
                 <View style={styles.weatherLoadingContainer}>
-                   <ActivityIndicator color={MM_Colors.primary} size="small" />
-                   <Text style={styles.loadingText}>Sensing Atmosphere...</Text>
+                  <ActivityIndicator color={MM_Colors.primary} size="small" />
+                  <Text style={styles.loadingText}>Sensing Atmosphere...</Text>
                 </View>
               ) : (
                 <>
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={styles.cityText}>{weather?.desc || 'Atmosphere'}</Text>
-                        <Ionicons name="location" size={18} color={MM_Colors.primary} />
+                      <Text style={styles.cityText}>{weather?.desc || 'Atmosphere'}</Text>
+                      <Ionicons name="location" size={18} color={MM_Colors.primary} />
                     </View>
                     <Text style={styles.weatherStatus}>{weather?.status || 'Setting focus...'}</Text>
                     <View style={styles.tempRow}>
@@ -509,10 +509,10 @@ export default function DashboardScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-               <Text style={styles.modalTitle}>New Ritual</Text>
-               <Pressable onPress={() => setIsAddingHabit(false)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-                 <Ionicons name="close" size={24} color={MM_Colors.textVariant} />
-               </Pressable>
+              <Text style={styles.modalTitle}>New Ritual</Text>
+              <Pressable onPress={() => setIsAddingHabit(false)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+                <Ionicons name="close" size={24} color={MM_Colors.textVariant} />
+              </Pressable>
             </View>
             <TextInput
               style={styles.input}
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   topHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   logoText: { ...Typography.title, color: MM_Colors.primary, fontWeight: '800' },
 
-  greetingSection: { },
+  greetingSection: {},
   dateLabel: { ...Typography.caption, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8, textTransform: 'uppercase' },
   greetingTitle: { ...Typography.header, letterSpacing: -1.5, lineHeight: 40 },
   greetingSub: { ...Typography.body, color: MM_Colors.textVariant, marginTop: 12, maxWidth: '90%' },
