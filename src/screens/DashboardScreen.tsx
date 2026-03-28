@@ -443,6 +443,18 @@ export default function DashboardScreen() {
               >
                 <Text style={styles.logoText}>Daily Hub</Text>
               </Pressable>
+              
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <Pressable 
+                  onPress={() => setThemeMode(isDark ? 'light' : 'dark')}
+                  style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <Ionicons name={isDark ? "sunny" : "moon"} size={22} color={colors.primary} />
+                </Pressable>
+                <View style={styles.headerBtn}>
+                   <Ionicons name="notifications-outline" size={22} color={colors.primary} />
+                </View>
+              </View>
             </View>
 
             <View style={styles.greetingSection}>

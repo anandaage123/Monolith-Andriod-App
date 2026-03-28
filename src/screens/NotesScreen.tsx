@@ -26,7 +26,8 @@ const writeAsStringAsync = (FileSystem as any).writeAsStringAsync;
 import * as Haptics from 'expo-haptics';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MM_Colors, Typography, Shadows, Spacing } from '../theme/Theme';
+import { Typography, Shadows, Spacing } from '../theme/Theme';
+import { useTheme } from '../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -304,8 +305,8 @@ export default function NotesScreen() {
       <View style={styles.authMain}>
         <Animated.View style={[styles.identitySection, { transform: [{ translateX: shakeAnim }] }]}>
           <View style={styles.enhancedIconContainer}>
-             <LinearGradient colors={[MM_Colors.primary + '20', MM_Colors.primary + '05']} style={styles.iconCircle}>
-                <MaterialCommunityIcons name="feather" size={44} color={MM_Colors.primary} />
+             <LinearGradient colors={[colors.primary + '20', colors.primary + '05']} style={styles.iconCircle}>
+                <MaterialCommunityIcons name="feather" size={44} color={colors.primary} />
              </LinearGradient>
           </View>
           <Text style={styles.authHeading}>
@@ -324,7 +325,7 @@ export default function NotesScreen() {
 
         {showHint && (
           <View style={{position: 'absolute', right: 20, top: height * 0.4}}>
-            <Text style={{fontSize: 14, color: MM_Colors.textVariant, opacity: 0.1, fontWeight: '800'}}>{hint}</Text>
+            <Text style={{fontSize: 14, color: colors.textVariant, opacity: 0.1, fontWeight: '800'}}>{hint}</Text>
           </View>
         )}
 
@@ -339,7 +340,7 @@ export default function NotesScreen() {
              )
           ))}
           <Pressable style={styles.keypadBtn} onPress={removeLastDigit}>
-            <Ionicons name="backspace-outline" size={28} color={MM_Colors.textVariant} />
+            <Ionicons name="backspace-outline" size={28} color={colors.textVariant} />
           </Pressable>
         </View>
       </View>
@@ -349,7 +350,7 @@ export default function NotesScreen() {
   if (hasRegisteredPin === null) {
       return (
         <View style={[styles.mainContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-           <ActivityIndicator size="large" color={MM_Colors.primary} />
+           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       );
   }
@@ -373,7 +374,7 @@ export default function NotesScreen() {
           <Text style={styles.appBarSub}>DAILY HUB</Text>
         </View>
         <TouchableOpacity style={styles.headerIcon} onPress={() => setIsSettingsVisible(true)}>
-          <Ionicons name="settings-outline" size={24} color={MM_Colors.text} />
+          <Ionicons name="settings-outline" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -396,7 +397,7 @@ export default function NotesScreen() {
         {/* Search */}
         <View style={styles.searchSection}>
           <View style={styles.searchBarContainer}>
-            <Ionicons name="search" size={20} color={MM_Colors.textVariant} />
+            <Ionicons name="search" size={20} color={colors.textVariant} />
             <TextInput 
               placeholder="Search your thoughts..."
               value={searchQuery}
@@ -406,7 +407,7 @@ export default function NotesScreen() {
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={18} color={MM_Colors.textVariant} />
+                <Ionicons name="close-circle" size={18} color={colors.textVariant} />
               </TouchableOpacity>
             )}
           </View>
@@ -436,7 +437,7 @@ export default function NotesScreen() {
         {filteredNotes.length === 0 && (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconBg}>
-               <MaterialCommunityIcons name="feather" size={40} color={MM_Colors.primary} />
+               <MaterialCommunityIcons name="feather" size={40} color={colors.primary} />
             </View>
             <Text style={styles.emptyTextTitle}>No Entries Found</Text>
             <Text style={styles.emptyTextSub}>
@@ -472,7 +473,7 @@ export default function NotesScreen() {
                  <View style={styles.bottomTag}>
                     <Text style={styles.tagText}>{note.category}</Text>
                  </View>
-                 <Ionicons name="chevron-forward-outline" size={16} color={MM_Colors.textVariant} />
+                 <Ionicons name="chevron-forward-outline" size={16} color={colors.textVariant} />
               </View>
             </TouchableOpacity>
           ))}
@@ -490,7 +491,7 @@ export default function NotesScreen() {
         }}
       >
         <LinearGradient 
-          colors={[MM_Colors.primary, MM_Colors.primaryLight]} 
+          colors={[colors.primary, colors.primaryLight]} 
           style={styles.fabInner}
         >
           <Ionicons name="add" size={32} color="#FFF" />
@@ -513,7 +514,7 @@ export default function NotesScreen() {
                 {isEditing ? (currentNote.id ? 'Edit Entry' : 'New Entry') : 'Reading'}
               </Text>
               <TouchableOpacity onPress={isViewing ? () => setIsEditing(true) : saveCurrentNote}>
-                 <Text style={[styles.navText, { color: MM_Colors.primary, fontWeight: '800' }]}>
+                 <Text style={[styles.navText, { color: colors.primary, fontWeight: '800' }]}>
                    {isViewing ? 'Edit' : 'Save'}
                  </Text>
               </TouchableOpacity>
@@ -577,8 +578,8 @@ export default function NotesScreen() {
                 ) : (
                   <View style={styles.viewContent}>
                      <View style={styles.viewMeta}>
-                        <View style={[styles.tagBadge, {backgroundColor: MM_Colors.primary + '15'}]}>
-                           <Text style={[styles.tagText, {color: MM_Colors.primary}]}>{currentNote.category}</Text>
+                        <View style={[styles.tagBadge, {backgroundColor: colors.primary + '15'}]}>
+                           <Text style={[styles.tagText, {color: colors.primary}]}>{currentNote.category}</Text>
                         </View>
                         <Text style={styles.viewDate}>{currentNote.date}</Text>
                      </View>
@@ -595,9 +596,9 @@ export default function NotesScreen() {
                         onPress={() => { setNoteToDelete(currentNote.id!); setIsDeleteModalVisible(true); }}
                      >
                         <View style={[styles.actionIconBg, {backgroundColor: '#FFF2F5'}]}>
-                           <Ionicons name="trash-outline" size={20} color={MM_Colors.error} />
+                           <Ionicons name="trash-outline" size={20} color={colors.error} />
                         </View>
-                        <Text style={[styles.actionTextMain, {color: MM_Colors.error}]}>Delete Entry</Text>
+                        <Text style={[styles.actionTextMain, {color: colors.error}]}>Delete Entry</Text>
                      </TouchableOpacity>
                   </View>
                 )}
@@ -616,8 +617,8 @@ export default function NotesScreen() {
              
              <View style={styles.actionGroup}>
                <Pressable style={styles.actionRow} onPress={exportNotes}>
-                  <View style={[styles.actionIconBg, {backgroundColor: MM_Colors.primary + '15'}]}>
-                    <Ionicons name="cloud-download-outline" size={20} color={MM_Colors.primary} />
+                  <View style={[styles.actionIconBg, {backgroundColor: colors.primary + '15'}]}>
+                    <Ionicons name="cloud-download-outline" size={20} color={colors.primary} />
                   </View>
                   <View style={{flex: 1, paddingLeft: 12}}>
                     <Text style={styles.actionTextMain}>Export Entries</Text>
@@ -627,7 +628,7 @@ export default function NotesScreen() {
 
                <Pressable style={styles.actionRow} onPress={startSetup}>
                   <View style={[styles.actionIconBg, {backgroundColor: '#F7F7F9'}]}>
-                    <Ionicons name="key-outline" size={20} color={MM_Colors.text} />
+                    <Ionicons name="key-outline" size={20} color={colors.text} />
                   </View>
                   <View style={{flex: 1, paddingLeft: 12}}>
                     <Text style={styles.actionTextMain}>Privacy Settings</Text>
@@ -647,10 +648,10 @@ export default function NotesScreen() {
                   ]);
                }}>
                   <View style={[styles.actionIconBg, {backgroundColor: '#FFF2F5'}]}>
-                    <Ionicons name="trash-outline" size={20} color={MM_Colors.error} />
+                    <Ionicons name="trash-outline" size={20} color={colors.error} />
                   </View>
                   <View style={{flex: 1, paddingLeft: 12}}>
-                    <Text style={[styles.actionTextMain, {color: MM_Colors.error}]}>Wipe Data</Text>
+                    <Text style={[styles.actionTextMain, {color: colors.error}]}>Wipe Data</Text>
                     <Text style={styles.actionTextSub}>Permanently delete all notes</Text>
                   </View>
                </Pressable>
@@ -668,7 +669,7 @@ export default function NotesScreen() {
         <View style={styles.modalOverlayCenter}>
           <View style={styles.confirmContent}>
             <View style={styles.confirmIconBg}>
-               <Ionicons name="trash-bin-outline" size={28} color={MM_Colors.error} />
+               <Ionicons name="trash-bin-outline" size={28} color={colors.error} />
             </View>
             <Text style={styles.confirmTitle}>Delete this entry?</Text>
             <Text style={styles.confirmSub}>You cannot undo this action.</Text>
@@ -704,10 +705,10 @@ const styles = StyleSheet.create({
   },
   iconCircle: { width: 70, height: 70, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   authHeading: { ...Typography.header, fontSize: 32, textAlign: 'center', letterSpacing: -1 },
-  authSubtext: { ...Typography.body, color: MM_Colors.textVariant, textAlign: 'center', fontSize: 16, marginTop: 4, opacity: 0.7 },
+  authSubtext: { ...Typography.body, color: colors.textVariant, textAlign: 'center', fontSize: 16, marginTop: 4, opacity: 0.7 },
   pinDisplay: { flexDirection: 'row', gap: 16, marginBottom: 56 },
   pinDot: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#E0E0E8' },
-  pinDotActive: { backgroundColor: MM_Colors.primary, ...Shadows.soft },
+  pinDotActive: { backgroundColor: colors.primary, ...Shadows.soft },
   keypad: { width: '100%', maxWidth: 300, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 16 },
   keypadBtn: { 
     width: 78, 
@@ -731,12 +732,12 @@ const styles = StyleSheet.create({
     paddingBottom: 20 
   },
   logoText: { ...Typography.header, fontSize: 36, letterSpacing: -1.5 },
-  appBarSub: { ...Typography.caption, color: MM_Colors.textVariant, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  appBarSub: { ...Typography.caption, color: colors.textVariant, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   headerIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#FFF', justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
 
   summaryBar: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 24, alignItems: 'center' },
   summaryItem: { paddingRight: 24 },
-  summaryVal: { ...Typography.header, fontSize: 24, color: MM_Colors.text },
+  summaryVal: { ...Typography.header, fontSize: 24, color: colors.text },
   summaryLabel: { ...Typography.caption, fontSize: 13, fontWeight: '600' },
   summaryDivider: { width: 1, height: 30, backgroundColor: '#E0E0EA', marginRight: 24 },
 
@@ -764,8 +765,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.01)'
   },
-  filterChipActive: { backgroundColor: MM_Colors.primary, ...Shadows.soft },
-  filterChipText: { ...Typography.caption, fontWeight: '800', color: MM_Colors.textVariant, fontSize: 13 },
+  filterChipActive: { backgroundColor: colors.primary, ...Shadows.soft },
+  filterChipText: { ...Typography.caption, fontWeight: '800', color: colors.textVariant, fontSize: 13 },
 
   notesGrid: { paddingHorizontal: 24, gap: 20 },
   noteCard: { 
@@ -779,8 +780,8 @@ const styles = StyleSheet.create({
   noteTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   cardIndicatorMood: { width: 50, height: 50, borderRadius: 18, backgroundColor: '#F0F0FF', justifyContent: 'center', alignItems: 'center' },
   noteCardTitle: { ...Typography.title, fontSize: 20, fontWeight: '800', marginBottom: 2 },
-  noteDateText: { ...Typography.caption, color: MM_Colors.textVariant, fontWeight: '600' },
-  noteCardContent: { ...Typography.body, fontSize: 16, color: MM_Colors.textVariant, lineHeight: 24, opacity: 0.8 },
+  noteDateText: { ...Typography.caption, color: colors.textVariant, fontWeight: '600' },
+  noteCardContent: { ...Typography.body, fontSize: 16, color: colors.textVariant, lineHeight: 24, opacity: 0.8 },
   noteBottom: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
@@ -791,7 +792,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F7F7F9'
   },
   bottomTag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: '#FAFAFF' },
-  tagText: { ...Typography.caption, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, color: MM_Colors.primary },
+  tagText: { ...Typography.caption, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, color: colors.primary },
 
   fabMain: { position: 'absolute', bottom: 32, right: 24, width: 68, height: 68, borderRadius: 28, ...Shadows.soft, elevation: 8 },
   fabInner: { width: '100%', height: '100%', borderRadius: 28, justifyContent: 'center', alignItems: 'center' },
@@ -808,11 +809,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F9'
   },
   headerTitleMain: { ...Typography.title, fontSize: 18, fontWeight: '800' },
-  navText: { color: MM_Colors.textVariant, fontSize: 17, fontWeight: '600' },
+  navText: { color: colors.textVariant, fontSize: 17, fontWeight: '600' },
 
   editControls: { paddingHorizontal: 24, marginTop: 24, marginBottom: 28 },
   selectorGroup: { marginBottom: 24 },
-  labelSmall: { ...Typography.caption, fontWeight: '800', color: MM_Colors.textVariant, marginBottom: 12, letterSpacing: 1 },
+  labelSmall: { ...Typography.caption, fontWeight: '800', color: colors.textVariant, marginBottom: 12, letterSpacing: 1 },
   moodBadge: { 
     width: 56, 
     height: 56, 
@@ -821,7 +822,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center', 
     alignItems: 'center'
   },
-  moodActive: { backgroundColor: '#FFF', borderWidth: 2, borderColor: MM_Colors.primary, ...Shadows.soft },
+  moodActive: { backgroundColor: '#FFF', borderWidth: 2, borderColor: colors.primary, ...Shadows.soft },
   catChip: { 
     paddingHorizontal: 22, 
     paddingVertical: 12, 
@@ -831,8 +832,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.02)'
   },
-  catChipActive: { backgroundColor: MM_Colors.primary, ...Shadows.soft },
-  catChipText: { ...Typography.body, fontWeight: '700', color: MM_Colors.textVariant },
+  catChipActive: { backgroundColor: colors.primary, ...Shadows.soft },
+  catChipText: { ...Typography.body, fontWeight: '700', color: colors.textVariant },
 
   titleInput: { ...Typography.header, fontSize: 34, paddingHorizontal: 24, marginBottom: 16, letterSpacing: -1 },
   contentInput: { 
@@ -848,7 +849,7 @@ const styles = StyleSheet.create({
   viewContent: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 120 },
   viewMeta: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
   tagBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
-  viewDate: { ...Typography.body, color: MM_Colors.textVariant, fontSize: 16, fontWeight: '500' },
+  viewDate: { ...Typography.body, color: colors.textVariant, fontSize: 16, fontWeight: '500' },
   viewTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 },
   viewTitle: { ...Typography.header, fontSize: 38, flex: 1, letterSpacing: -1.5, lineHeight: 46 },
   viewMoodBig: { fontSize: 44, marginLeft: 16 },
@@ -883,19 +884,19 @@ const styles = StyleSheet.create({
   },
   actionIconBg: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
   actionTextMain: { ...Typography.body, fontSize: 18, fontWeight: '700' },
-  actionTextSub: { ...Typography.caption, fontSize: 13, color: MM_Colors.textVariant, marginTop: 2 },
+  actionTextSub: { ...Typography.caption, fontSize: 13, color: colors.textVariant, marginTop: 2 },
   closeActionBtn: { backgroundColor: '#F4F4F9', paddingVertical: 16, borderRadius: 20, alignItems: 'center' },
-  closeActionText: { ...Typography.body, fontWeight: '700', color: MM_Colors.textVariant },
+  closeActionText: { ...Typography.body, fontWeight: '700', color: colors.textVariant },
 
   modalOverlayCenter: { flex: 1, backgroundColor: 'rgba(15,14,23,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   confirmContent: { backgroundColor: '#FFF', borderRadius: 36, padding: 32, width: '100%', maxWidth: 320, alignItems: 'center', ...Shadows.soft },
   confirmIconBg: { width: 70, height: 70, borderRadius: 24, backgroundColor: '#FFF2F5', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
   confirmTitle: { ...Typography.header, fontSize: 22, textAlign: 'center' },
-  confirmSub: { ...Typography.body, fontSize: 15, textAlign: 'center', color: MM_Colors.textVariant, marginTop: 8, marginBottom: 32 },
+  confirmSub: { ...Typography.body, fontSize: 15, textAlign: 'center', color: colors.textVariant, marginTop: 8, marginBottom: 32 },
   confirmActions: { flexDirection: 'row', gap: 12, width: '100%' },
   cancelConfirmBtn: { flex: 1, paddingVertical: 16, alignItems: 'center', borderRadius: 18, backgroundColor: '#F4F4F9' },
-  cancelConfirmText: { ...Typography.body, color: MM_Colors.textVariant, fontWeight: '700' },
-  deleteConfirmBtn: { flex: 1, paddingVertical: 16, alignItems: 'center', borderRadius: 18, backgroundColor: MM_Colors.error },
+  cancelConfirmText: { ...Typography.body, color: colors.textVariant, fontWeight: '700' },
+  deleteConfirmBtn: { flex: 1, paddingVertical: 16, alignItems: 'center', borderRadius: 18, backgroundColor: colors.error },
   deleteConfirmText: { ...Typography.body, color: '#FFF', fontWeight: '800' },
 
   emptyContainer: { alignItems: 'center', marginTop: 100, paddingHorizontal: 40 },
