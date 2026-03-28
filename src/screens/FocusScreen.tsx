@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,9 @@ import {
   Dimensions,
   StatusBar,
   TouchableOpacity,
+  TouchableNativeFeedback,
+  Modal,
+  Pressable,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,433 +25,1560 @@ import * as Haptics from 'expo-haptics';
 import { Typography, Shadows } from '../theme/Theme';
 import { useTheme } from '../context/ThemeContext';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const ds = (size: number) => (size * width) / 414;
 
-type TimerStatus = 'setup' | 'focus' | 'break';
+// ─── Types ────────────────────────────────────────────────────────────────────
+type TimerStatus = 'setup' | 'focus' | 'break' | 'complete';
+
 interface SessionLog {
   id: string;
   name: string;
   tag: string;
   duration: number;
   timestamp: number;
+  mode: string;
+  completedSprints?: number;
 }
 
+interface SprintRecord {
+  index: number;
+  completed: boolean;
+  duration: number;
+}
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 const MODES = [
-  { id: 'pomodoro', name: 'Pomodoro', focus: 25, break: 5, icon: 'timer-outline' },
-  { id: 'deep_work', name: 'Deep Work', focus: 90, break: 15, icon: 'flash-outline' },
-  { id: 'zen', name: 'Zen Flow', focus: 10, break: 0, icon: 'leaf-outline' },
-  { id: 'custom', name: 'Custom Flow', focus: 25, break: 5, icon: 'options-outline' },
+  {
+    id: 'pomodoro',
+    name: 'Pomodoro',
+    focus: 25,
+    break: 5,
+    icon: 'timer-outline' as const,
+    sprints: 4,
+    desc: '25 min focus, 5 min break',
+    color: '#1A73E8',
+  },
+  {
+    id: 'deep_work',
+    name: 'Deep Work',
+    focus: 90,
+    break: 15,
+    icon: 'flash-outline' as const,
+    sprints: 2,
+    desc: '90 min deep dive, 15 min rest',
+    color: '#7B1FA2',
+  },
+  {
+    id: 'zen',
+    name: 'Zen Flow',
+    focus: 10,
+    break: 0,
+    icon: 'leaf-outline' as const,
+    sprints: 1,
+    desc: 'Calm, breathe, be present',
+    color: '#0F9D58',
+  },
+  {
+    id: 'custom',
+    name: 'Custom',
+    focus: 25,
+    break: 5,
+    icon: 'options-outline' as const,
+    sprints: 3,
+    desc: 'Your own rhythm',
+    color: '#F57C00',
+  },
 ];
 
-const TAGS = ['Work', 'Code', 'Study', 'Personal'];
+// Zen duration presets (key ask from user)
+const ZEN_DURATIONS = [2, 5, 10, 15, 20, 30, 45, 60];
 
+const TAGS = ['Work', 'Code', 'Study', 'Personal', 'Health', 'Zen'];
+
+const SPRINT_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6];
+
+// ─── Ripple Button (Material-style) ──────────────────────────────────────────
+const RippleBtn: React.FC<{
+  onPress: () => void;
+  style?: any;
+  children: React.ReactNode;
+  disabled?: boolean;
+}> = ({ onPress, style, children, disabled }) => {
+  if (Platform.OS === 'android') {
+    return (
+      <TouchableNativeFeedback
+        onPress={onPress}
+        disabled={disabled}
+        background={TouchableNativeFeedback.Ripple('rgba(255,255,255,0.2)', true)}
+      >
+        <View style={style}>{children}</View>
+      </TouchableNativeFeedback>
+    );
+  }
+  return (
+    <TouchableOpacity onPress={onPress} style={style} disabled={disabled} activeOpacity={0.78}>
+      {children}
+    </TouchableOpacity>
+  );
+};
+
+// ─── Animated Water Fill ──────────────────────────────────────────────────────
+const WaterFill: React.FC<{ percent: number; color: string; isActive: boolean }> = ({
+  percent,
+  color,
+  isActive,
+}) => {
+  const waveAnim1 = useRef(new Animated.Value(0)).current;
+  const waveAnim2 = useRef(new Animated.Value(0)).current;
+  const fillAnim = useRef(new Animated.Value(percent)).current;
+
+  useEffect(() => {
+    Animated.timing(fillAnim, {
+      toValue: percent,
+      duration: 800,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [percent]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const loop1 = Animated.loop(
+      Animated.timing(waveAnim1, {
+        toValue: 1,
+        duration: 2800,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    const loop2 = Animated.loop(
+      Animated.timing(waveAnim2, {
+        toValue: 1,
+        duration: 3600,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    loop1.start();
+    loop2.start();
+    return () => {
+      loop1.stop();
+      loop2.stop();
+    };
+  }, [isActive]);
+
+  const ringSize = ds(270);
+  const fillHeight = fillAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, ringSize],
+    extrapolate: 'clamp',
+  });
+
+  // Wave translateX animations
+  const wave1X = waveAnim1.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-ringSize, ringSize],
+  });
+  const wave2X = waveAnim2.interpolate({
+    inputRange: [0, 1],
+    outputRange: [ringSize, -ringSize],
+  });
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: fillHeight,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Base fill */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          top: 0,
+          backgroundColor: color + '18',
+        }}
+      />
+      {/* Wave 1 */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: -12,
+          left: 0,
+          right: 0,
+          height: 24,
+          transform: [{ translateX: wave1X }],
+        }}
+      >
+        <View
+          style={{
+            width: ringSize * 2.5,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: color + '30',
+          }}
+        />
+      </Animated.View>
+      {/* Wave 2 */}
+      <Animated.View
+        style={{
+          position: 'absolute',
+          top: -8,
+          left: 0,
+          right: 0,
+          height: 16,
+          transform: [{ translateX: wave2X }],
+        }}
+      >
+        <View
+          style={{
+            width: ringSize * 2.5,
+            height: 16,
+            borderRadius: 8,
+            backgroundColor: color + '20',
+          }}
+        />
+      </Animated.View>
+      {/* Draining ripple on empty */}
+      {percent < 5 && (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 4,
+            backgroundColor: color + '40',
+          }}
+        />
+      )}
+    </Animated.View>
+  );
+};
+
+// ─── Sprint Dots ──────────────────────────────────────────────────────────────
+const SprintDots: React.FC<{
+  total: number;
+  completed: number;
+  current: number;
+  color: string;
+}> = ({ total, completed, current, color }) => {
+  const scaleAnims = useRef(
+    Array.from({ length: total }, () => new Animated.Value(1))
+  ).current;
+
+  useEffect(() => {
+    if (current < total) {
+      Animated.sequence([
+        Animated.timing(scaleAnims[current], {
+          toValue: 1.4,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnims[current], {
+          toValue: 1.15,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [current]);
+
+  return (
+    <View style={{ flexDirection: 'row', gap: ds(8), justifyContent: 'center', marginTop: ds(12) }}>
+      {Array.from({ length: total }, (_, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: i === current ? ds(20) : ds(8),
+            height: ds(8),
+            borderRadius: ds(4),
+            backgroundColor:
+              i < completed
+                ? color
+                : i === current
+                  ? color + 'AA'
+                  : color + '30',
+            transform: [{ scale: scaleAnims[i] }],
+          }}
+        />
+      ))}
+    </View>
+  );
+};
+
+// ─── Completion Celebration ───────────────────────────────────────────────────
+const CelebrationOverlay: React.FC<{
+  visible: boolean;
+  onDismiss: () => void;
+  completedSprints: number;
+  sessionName: string;
+  modeColor: string;
+  totalMinutes: number;
+}> = ({ visible, onDismiss, completedSprints, sessionName, modeColor, totalMinutes }) => {
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 6,
+          tension: 80,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(ring1, { toValue: 1, duration: 1800, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(ring1, { toValue: 0, duration: 0, useNativeDriver: true }),
+          ])
+        ),
+        Animated.loop(
+          Animated.sequence([
+            Animated.delay(600),
+            Animated.timing(ring2, { toValue: 1, duration: 1800, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            Animated.timing(ring2, { toValue: 0, duration: 0, useNativeDriver: true }),
+          ])
+        ),
+      ]).start();
+    } else {
+      scaleAnim.setValue(0);
+      opacityAnim.setValue(0);
+    }
+  }, [visible]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent animationType="fade" visible={visible}>
+      <Animated.View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.65)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          opacity: opacityAnim,
+        }}
+      >
+        {/* Expanding rings */}
+        <Animated.View
+          style={{
+            position: 'absolute',
+            width: ds(300),
+            height: ds(300),
+            borderRadius: ds(150),
+            borderWidth: 2,
+            borderColor: modeColor + '60',
+            transform: [
+              { scale: ring1.interpolate({ inputRange: [0, 1], outputRange: [0.4, 2.0] }) },
+            ],
+            opacity: ring1.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.8, 0.3, 0] }),
+          }}
+        />
+        <Animated.View
+          style={{
+            position: 'absolute',
+            width: ds(300),
+            height: ds(300),
+            borderRadius: ds(150),
+            borderWidth: 2,
+            borderColor: modeColor + '40',
+            transform: [
+              { scale: ring2.interpolate({ inputRange: [0, 1], outputRange: [0.4, 2.2] }) },
+            ],
+            opacity: ring2.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.8, 0.3, 0] }),
+          }}
+        />
+
+        <Animated.View
+          style={{
+            backgroundColor: '#fff',
+            borderRadius: ds(32),
+            padding: ds(36),
+            alignItems: 'center',
+            width: width - ds(48),
+            transform: [{ scale: scaleAnim }],
+            shadowColor: modeColor,
+            shadowOpacity: 0.3,
+            shadowRadius: 32,
+            elevation: 20,
+          }}
+        >
+          <View
+            style={{
+              width: ds(72),
+              height: ds(72),
+              borderRadius: ds(36),
+              backgroundColor: modeColor + '15',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: ds(16),
+            }}
+          >
+            <Ionicons name="checkmark-circle" size={ds(44)} color={modeColor} />
+          </View>
+
+          <Text style={{ fontSize: ds(22), fontWeight: '800', color: '#1A1A2E', marginBottom: ds(4) }}>
+            Session Complete!
+          </Text>
+          <Text style={{ fontSize: ds(14), color: '#666', marginBottom: ds(24), textAlign: 'center' }}>
+            {sessionName || 'Focus Session'}
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: ds(16), marginBottom: ds(28) }}>
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: ds(28), fontWeight: '800', color: modeColor }}>{completedSprints}</Text>
+              <Text style={{ fontSize: ds(11), color: '#999', fontWeight: '600' }}>SPRINTS</Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: '#eee' }} />
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: ds(28), fontWeight: '800', color: modeColor }}>{totalMinutes}</Text>
+              <Text style={{ fontSize: ds(11), color: '#999', fontWeight: '600' }}>MINUTES</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={onDismiss}
+            style={{
+              width: '100%',
+              height: ds(52),
+              borderRadius: ds(26),
+              backgroundColor: modeColor,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: ds(16) }}>Done</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function FocusScreen() {
   const { colors, isDark } = useTheme();
   useKeepAwake();
 
-  // ─── State ────────────────────────────────────────────────────────────────
+  // ─── State ──────────────────────────────────────────────────────────────────
   const [status, setStatus] = useState<TimerStatus>('setup');
   const [activeModeIdx, setActiveModeIdx] = useState(0);
   const [sessionName, setSessionName] = useState('');
   const [sessionTag, setSessionTag] = useState('Work');
-  
+
   const [customFocus, setCustomFocus] = useState('25');
   const [customBreak, setCustomBreak] = useState('5');
-  
+  const [customSprints, setCustomSprints] = useState(3);
+
+  // Zen-specific duration picker
+  const [zenDuration, setZenDuration] = useState(10);
+
+  // Sprint tracking
+  const [totalSprints, setTotalSprints] = useState(4);
+  const [currentSprint, setCurrentSprint] = useState(0);
+  const [completedSprints, setCompletedSprints] = useState(0);
+
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [totalTime, setTotalTime] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
-  
   const [logs, setLogs] = useState<SessionLog[]>([]);
-  
+  const [showComplete, setShowComplete] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState(0);
+
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const breatheOpacity = useRef(new Animated.Value(0)).current;
   const wavyPulse = useRef(new Animated.Value(0)).current;
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  const slideUp = useRef(new Animated.Value(30)).current;
+  const headerSlide = useRef(new Animated.Value(-20)).current;
+  const headerFade = useRef(new Animated.Value(0)).current;
+  const setupFade = useRef(new Animated.Value(0)).current;
+  const setupSlide = useRef(new Animated.Value(20)).current;
+  const timerScale = useRef(new Animated.Value(0.85)).current;
+
   const [breatheLabel, setBreatheLabel] = useState('Inhale');
 
   const mode = MODES[activeModeIdx];
   const isCustomMode = mode.id === 'custom';
   const isZenMode = mode.id === 'zen';
-  
-  // Theme Overrides
-  const focusGreen = '#006947'; // Emerald
-  const breakRed = '#B41340';   // Ruby
-  const currentThemeColor = status === 'focus' ? focusGreen : (status === 'break' ? breakRed : colors.primary);
+  const modeColor = mode.color;
 
-  // ─── Persistence ──────────────────────────────────────────────────────────
+  const focusGreen = '#0F9D58';
+  const breakBlue = '#1A73E8';
+  const currentThemeColor =
+    status === 'focus'
+      ? modeColor
+      : status === 'break'
+        ? breakBlue
+        : status === 'complete'
+          ? modeColor
+          : modeColor;
+
+  // ─── Entry animations ────────────────────────────────────────────────────────
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(setupFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(setupSlide, { toValue: 0, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  useEffect(() => {
+    if (status !== 'setup') {
+      timerScale.setValue(0.85);
+      fadeIn.setValue(0);
+      slideUp.setValue(30);
+      headerFade.setValue(0);
+      headerSlide.setValue(-20);
+
+      Animated.parallel([
+        Animated.spring(timerScale, { toValue: 1, friction: 7, tension: 60, useNativeDriver: true }),
+        Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(slideUp, { toValue: 0, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(headerFade, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.timing(headerSlide, { toValue: 0, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+    }
+  }, [status]);
+
+  // ─── Persistence ─────────────────────────────────────────────────────────────
   useEffect(() => { loadLogs(); }, []);
 
   const loadLogs = async () => {
     try {
-      const saved = await AsyncStorage.getItem('@focus_logs_v2');
+      const saved = await AsyncStorage.getItem('@focus_logs_v3');
       if (saved) setLogs(JSON.parse(saved));
-    } catch (e) {
-      console.error('Failed to load logs', e);
-    }
+    } catch { }
   };
 
-  const saveSession = async () => {
+  const saveSession = useCallback(async () => {
     if (status !== 'focus') return;
     const newLog: SessionLog = {
       id: Date.now().toString(),
-      name: sessionName || (isZenMode ? 'Zen Meditation' : 'Primal Flow'),
+      name: sessionName || (isZenMode ? 'Zen Flow' : 'Focus Session'),
       tag: sessionTag,
       duration: Math.floor(totalTime / 60),
       timestamp: Date.now(),
+      mode: mode.id,
+      completedSprints: completedSprints + 1,
     };
-    const updated = [newLog, ...logs].slice(0, 5);
+    const updated = [newLog, ...logs].slice(0, 8);
     setLogs(updated);
     try {
-      await AsyncStorage.setItem('@focus_logs_v2', JSON.stringify(updated));
-    } catch (e) {
-      console.error('Failed to save logs', e);
-    }
-  };
+      await AsyncStorage.setItem('@focus_logs_v3', JSON.stringify(updated));
+    } catch { }
+  }, [status, sessionName, sessionTag, totalTime, mode.id, completedSprints, logs, isZenMode]);
 
-  // ─── Feedback & Logic ─────────────────────────────────────────────────────
+  // ─── Haptic ───────────────────────────────────────────────────────────────────
   const triggerHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Medium) => {
     if (Platform.OS !== 'web') Haptics.impactAsync(style);
   };
 
+  // ─── Format ───────────────────────────────────────────────────────────────────
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60);
     const s = secs % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // ─── Focus Engine ─────────────────────────────────────────────────────────
+  // ─── Timer Engine ─────────────────────────────────────────────────────────────
   useEffect(() => {
     let interval: any = null;
     if (isActive && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
-      }, 1000);
+      interval = setInterval(() => setTimeLeft((p) => p - 1), 1000);
     } else if (timeLeft === 0 && isActive) {
       handlePhaseEnd();
     }
     return () => clearInterval(interval);
   }, [isActive, timeLeft]);
 
-  const handlePhaseEnd = () => {
+  const handlePhaseEnd = useCallback(() => {
     setIsActive(false);
     triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-    Vibration.vibrate([0, 500, 200, 500]);
+    if (Platform.OS !== 'web') Vibration.vibrate([0, 400, 150, 400]);
 
     if (status === 'focus') {
       saveSession();
-      if (mode.break > 0) {
+      const newCompleted = completedSprints + 1;
+      setCompletedSprints(newCompleted);
+
+      if (newCompleted >= totalSprints) {
+        // All sprints done!
+        setStatus('complete');
+        setShowComplete(true);
+        return;
+      }
+
+      const breakSecs =
+        isZenMode
+          ? 0
+          : (isCustomMode ? (parseInt(customBreak) || 5) : mode.break) * 60;
+
+      if (breakSecs > 0) {
         setStatus('break');
-        const secs = (isCustomMode ? (parseInt(customBreak) || 5) : mode.break) * 60;
-        setTimeLeft(secs); setTotalTime(secs); setIsActive(true); 
+        setTimeLeft(breakSecs);
+        setTotalTime(breakSecs);
+        setIsActive(true);
       } else {
-        setStatus('focus');
-        const secs = (isZenMode ? mode.focus : (isCustomMode ? parseInt(customFocus)||25 : mode.focus)) * 60;
-        setTimeLeft(secs); setTotalTime(secs); setIsActive(false);
+        // zen or no-break: restart focus
+        const focusSecs = getFocusSecs();
+        setCurrentSprint(newCompleted);
+        setTimeLeft(focusSecs);
+        setTotalTime(focusSecs);
+        setIsActive(false);
       }
     } else if (status === 'break') {
+      const focusSecs = getFocusSecs();
+      setCurrentSprint(completedSprints);
       setStatus('focus');
-      const secs = (isCustomMode ? (parseInt(customFocus) || 25) : mode.focus) * 60;
-      setTimeLeft(secs); setTotalTime(secs); setIsActive(false); 
+      setTimeLeft(focusSecs);
+      setTotalTime(focusSecs);
+      setIsActive(false);
     }
+  }, [status, completedSprints, totalSprints, isZenMode, isCustomMode, customBreak, mode.break]);
+
+  const getFocusSecs = () => {
+    if (isZenMode) return zenDuration * 60;
+    if (isCustomMode) return (parseInt(customFocus) || 25) * 60;
+    return mode.focus * 60;
   };
 
   const skipPhase = () => {
-      triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-      handlePhaseEnd();
+    triggerHaptic();
+    handlePhaseEnd();
   };
 
-  // ─── Fluid Breathing & Water Animation ─────────────────────────────────────
+  const startSession = () => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+    const sprints = isCustomMode ? customSprints : isZenMode ? 1 : mode.sprints;
+    setTotalSprints(sprints);
+    setCompletedSprints(0);
+    setCurrentSprint(0);
+    const secs = getFocusSecs();
+    setTimeLeft(secs);
+    setTotalTime(secs);
+    setIsActive(true);
+    setStatus('focus');
+    setSessionStartTime(Date.now());
+  };
+
+  const handleCompleteSession = () => {
+    setShowComplete(false);
+    setStatus('setup');
+    setIsActive(false);
+    setCompletedSprints(0);
+    setCurrentSprint(0);
+  };
+
+  // ─── Breathing & Wave animations ──────────────────────────────────────────────
   useEffect(() => {
     let animLoop: any = null;
     let waveLoop: any = null;
 
-    if (isActive && status !== 'setup') {
-      // Primary Breathing Loop
+    if (isActive && status !== 'setup' && status !== 'complete') {
       const breatheSequence = () => {
         setBreatheLabel('Inhale');
         animLoop = Animated.parallel([
-           Animated.timing(pulseAnim, { toValue: 1.15, duration: 4500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-           Animated.sequence([
-              Animated.timing(breatheOpacity, { toValue: 0.8, duration: 1000, useNativeDriver: true }),
-              Animated.delay(2000),
-              Animated.timing(breatheOpacity, { toValue: 0, duration: 1000, useNativeDriver: true })
-           ])
+          Animated.timing(pulseAnim, {
+            toValue: 1.12,
+            duration: 4500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.sequence([
+            Animated.timing(breatheOpacity, { toValue: 0.9, duration: 1200, useNativeDriver: true }),
+            Animated.delay(2000),
+            Animated.timing(breatheOpacity, { toValue: 0, duration: 1200, useNativeDriver: true }),
+          ]),
         ]);
         animLoop.start(({ finished }: any) => {
           if (!finished) return;
           setBreatheLabel('Exhale');
           Animated.parallel([
-             Animated.timing(pulseAnim, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-             Animated.sequence([
-                Animated.timing(breatheOpacity, { toValue: 0.8, duration: 1000, useNativeDriver: true }),
-                Animated.delay(2000),
-                Animated.timing(breatheOpacity, { toValue: 0, duration: 1000, useNativeDriver: true })
-             ])
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 4000,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.sequence([
+              Animated.timing(breatheOpacity, { toValue: 0.9, duration: 1000, useNativeDriver: true }),
+              Animated.delay(2000),
+              Animated.timing(breatheOpacity, { toValue: 0, duration: 1000, useNativeDriver: true }),
+            ]),
           ]).start(({ finished: f }: any) => {
-             if (f && isActive) breatheSequence();
+            if (f && isActive) breatheSequence();
           });
         });
       };
       breatheSequence();
 
-      // Fluid Wave Animation during Focus
       if (status === 'focus') {
         waveLoop = Animated.loop(
           Animated.sequence([
-            Animated.timing(wavyPulse, { toValue: 1, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-            Animated.timing(wavyPulse, { toValue: 0, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true })
+            Animated.timing(wavyPulse, {
+              toValue: 1,
+              duration: 2800,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
+            Animated.timing(wavyPulse, {
+              toValue: 0,
+              duration: 2800,
+              easing: Easing.inOut(Easing.sin),
+              useNativeDriver: true,
+            }),
           ])
         );
         waveLoop.start();
       }
     } else {
-       pulseAnim.setValue(1);
-       breatheOpacity.setValue(0);
-       wavyPulse.setValue(0);
-       if (animLoop) animLoop.stop();
-       if (waveLoop) waveLoop.stop();
+      pulseAnim.setValue(1);
+      breatheOpacity.setValue(0);
+      wavyPulse.setValue(0);
+      if (animLoop) animLoop.stop();
+      if (waveLoop) waveLoop.stop();
     }
-    return () => { 
-        if (animLoop) animLoop.stop(); 
-        if (waveLoop) waveLoop.stop();
+    return () => {
+      if (animLoop) animLoop.stop();
+      if (waveLoop) waveLoop.stop();
     };
   }, [isActive, status]);
 
-  // ─── Styles ─────────────────────────────────────────────────────────────
-  const s = StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
-    header: { paddingHorizontal: ds(24), paddingTop: Platform.OS === 'ios' ? ds(54) : ds(24), marginBottom: ds(16) },
-    title: { ...Typography.header, fontSize: ds(24), color: colors.text, letterSpacing: -0.5, textAlign: 'center' },
-    sub: { ...Typography.body, color: colors.textVariant, opacity: 0.6, fontSize: ds(13), marginTop: ds(2), textAlign: 'center' },
-    
-    // Setup
-    card: { backgroundColor: isDark ? colors.surfaceContainer : '#F3F4F9', borderRadius: ds(28), padding: ds(20), marginHorizontal: ds(24), marginBottom: ds(16) },
-    label: { ...Typography.caption, color: colors.primary, fontWeight: '700', marginBottom: ds(12), textTransform: 'uppercase', letterSpacing: ds(1.2) },
-    input: { ...Typography.body, fontSize: ds(18), color: colors.text, borderBottomWidth: 1.5, borderBottomColor: colors.surfaceContainer, paddingVertical: ds(8) },
-    
-    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: ds(10), marginTop: ds(4) },
-    gridItem: { 
-      flexDirection: 'row', alignItems: 'center', padding: ds(12), borderRadius: ds(16), 
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: 'transparent',
-      width: (width - ds(48) - ds(40) - ds(10)) / 2 
-    },
-    gridItemActive: { borderColor: colors.primary, backgroundColor: colors.primary + '15' },
-    gridItemText: { ...Typography.body, fontSize: ds(13), fontWeight: '700', color: colors.text, marginLeft: ds(8) },
-
-    tagRow: { flexDirection: 'row', gap: ds(8), marginTop: ds(16) },
-    tagChip: { 
-      paddingHorizontal: ds(16), 
-      paddingVertical: ds(10), 
-      borderRadius: ds(14), 
-      backgroundColor: colors.surface, 
-      borderWidth: 1.5, 
-      borderColor: 'transparent',
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    tagChipActive: { 
-      backgroundColor: colors.primary, 
-      borderColor: colors.primary,
-      transform: [{ scale: 1.05 }] // Subtle enlargement as a premium selection effect
-    },
-    tagText: { ...Typography.caption, fontWeight: '700', color: colors.textVariant, fontSize: ds(12) },
-    tagActiveText: { color: '#FFF' },
-
-    mainBtn: { height: ds(60), borderRadius: ds(30), backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginHorizontal: ds(24), marginTop: ds(8), ...Shadows.soft },
-    mainBtnText: { ...Typography.title, color: '#FFF', fontSize: ds(17), fontWeight: '800' },
-
-    // Records Section
-    recordsHeader: { marginTop: ds(32), marginHorizontal: ds(24), marginBottom: ds(12), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    recordsTitle: { ...Typography.caption, color: colors.text, fontWeight: '800', letterSpacing: ds(1.5), textTransform: 'uppercase' },
-    logCard: { 
-       backgroundColor: colors.surface, borderRadius: ds(20), padding: ds(16), 
-       marginHorizontal: ds(24), marginBottom: ds(10), flexDirection: 'row', 
-       alignItems: 'center', justifyContent: 'space-between', ...Shadows.soft 
-    },
-    logInfo: { flex: 1 },
-    logName: { ...Typography.body, fontSize: ds(14), fontWeight: '700', color: colors.text },
-    logMeta: { ...Typography.caption, fontSize: ds(11), color: colors.textVariant, opacity: 0.6, marginTop: ds(2) },
-    logBadgeRow: { flexDirection: 'row', gap: ds(6), marginTop: ds(4) },
-    logBadge: { backgroundColor: colors.primary + '10', paddingHorizontal: ds(8), paddingVertical: ds(4), borderRadius: ds(6) },
-    logBadgeText: { ...Typography.caption, fontSize: ds(10), color: colors.primary, fontWeight: '700' },
-
-    // Timer View
-    container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    ring: { 
-        width: ds(280), height: ds(280), borderRadius: ds(140), 
-        justifyContent: 'center', alignItems: 'center', 
-        backgroundColor: colors.surface,
-        borderWidth: ds(2), borderColor: colors.surfaceContainer,
-        overflow: 'hidden'
-    },
-    waveRing: { 
-        position: 'absolute', width: ds(300), height: ds(300), borderRadius: ds(150), 
-        borderWidth: 2, borderColor: currentThemeColor + '40' 
-    },
-    fill: { position: 'absolute', bottom: 0, width: '100%', backgroundColor: currentThemeColor + '10' },
-    timeText: { ...Typography.header, fontSize: ds(64), color: colors.text, letterSpacing: ds(-2) },
-    phaseText: { ...Typography.caption, fontWeight: '900', color: currentThemeColor, marginTop: ds(-4), letterSpacing: ds(2) },
-    
-    controlsRoot: { alignItems: 'center', marginTop: ds(40) },
-    exitBtn: { width: ds(56), height: ds(56), borderRadius: ds(28), backgroundColor: colors.surfaceContainer, justifyContent: 'center', alignItems: 'center', marginBottom: ds(20) },
-    controlsRow: { flexDirection: 'row', alignItems: 'center', gap: ds(24) },
-    ctrlBtn: { width: ds(52), height: ds(52), borderRadius: ds(26), backgroundColor: isDark ? colors.surfaceContainer : '#F3F4F9', justifyContent: 'center', alignItems: 'center' },
-    playBtn: { width: ds(84), height: ds(84), borderRadius: ds(42), backgroundColor: currentThemeColor, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
-
-    overlay: { marginBottom: ds(20), width: '100%', alignItems: 'center' },
-    overlayText: { ...Typography.header, fontSize: ds(18), color: currentThemeColor, letterSpacing: ds(5), textTransform: 'uppercase' },
-  });
-
   const percent = (timeLeft / totalTime) * 100;
 
+  // ─── Sprint progress bar (for header in timer view) ───────────────────────
+  const sprintProgress = totalSprints > 0 ? (completedSprints / totalSprints) * 100 : 0;
+
+  // ─── Styles ─────────────────────────────────────────────────────────────────
+  const s = StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background },
+
+    // Setup
+    header: {
+      paddingHorizontal: ds(24),
+      paddingTop: Platform.OS === 'ios' ? ds(56) : ds(28),
+      marginBottom: ds(12),
+    },
+    title: {
+      fontSize: ds(26),
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -0.5,
+    },
+    sub: {
+      fontSize: ds(13),
+      color: colors.textVariant,
+      opacity: 0.65,
+      marginTop: ds(3),
+    },
+
+    card: {
+      backgroundColor: isDark ? colors.surfaceContainer : '#F5F6FA',
+      borderRadius: ds(24),
+      padding: ds(20),
+      marginHorizontal: ds(16),
+      marginBottom: ds(14),
+    },
+    label: {
+      fontSize: ds(10),
+      fontWeight: '800',
+      color: colors.textVariant,
+      textTransform: 'uppercase',
+      letterSpacing: ds(1.5),
+      marginBottom: ds(12),
+    },
+    input: {
+      fontSize: ds(17),
+      color: colors.text,
+      borderBottomWidth: 1.5,
+      borderBottomColor: isDark ? colors.surfaceContainer : '#E0E0E0',
+      paddingVertical: ds(10),
+      fontWeight: '500',
+    },
+
+    // Mode grid — strict 2 per row
+    grid: {
+      flexDirection: 'column',
+      gap: ds(10),
+    },
+    gridRow: {
+      flexDirection: 'row',
+      gap: ds(10),
+    },
+    gridItem: {
+      flex: 1,
+      padding: ds(14),
+      borderRadius: ds(18),
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    gridItemActive: {
+      borderColor: modeColor,
+      backgroundColor: modeColor + '12',
+    },
+    gridItemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: ds(4) },
+    gridItemText: { fontSize: ds(13), fontWeight: '700', color: colors.text, marginLeft: ds(8) },
+    gridItemDesc: { fontSize: ds(10), color: colors.textVariant, opacity: 0.7 },
+
+    // Zen duration chips — wrap, no horizontal scroll
+    zenDurationRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ds(8),
+      marginTop: ds(4),
+    },
+    zenChip: {
+      paddingHorizontal: ds(14),
+      paddingVertical: ds(8),
+      borderRadius: ds(20),
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    zenChipActive: {
+      backgroundColor: modeColor,
+      borderColor: modeColor,
+    },
+    zenChipText: {
+      fontSize: ds(12),
+      fontWeight: '700',
+      color: colors.textVariant,
+    },
+    zenChipTextActive: {
+      color: '#fff',
+    },
+
+    // Sprint selector
+    sprintRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ds(8),
+      marginTop: ds(4),
+    },
+    sprintChip: {
+      width: ds(40),
+      height: ds(40),
+      borderRadius: ds(20),
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sprintChipActive: {
+      backgroundColor: modeColor,
+      borderColor: modeColor,
+    },
+    sprintChipText: {
+      fontSize: ds(14),
+      fontWeight: '700',
+      color: colors.textVariant,
+    },
+    sprintChipTextActive: { color: '#fff' },
+
+    // Tags — wrap
+    tagRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: ds(8),
+      marginTop: ds(14),
+    },
+    tagChip: {
+      paddingHorizontal: ds(14),
+      paddingVertical: ds(9),
+      borderRadius: ds(20),
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    tagChipActive: {
+      backgroundColor: modeColor,
+      borderColor: modeColor,
+    },
+    tagText: { fontSize: ds(12), fontWeight: '700', color: colors.textVariant },
+    tagActiveText: { color: '#fff' },
+
+    mainBtn: {
+      height: ds(58),
+      borderRadius: ds(29),
+      backgroundColor: modeColor,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginHorizontal: ds(16),
+      marginTop: ds(4),
+      marginBottom: ds(24),
+      ...Shadows.soft,
+    },
+    mainBtnText: { color: '#fff', fontSize: ds(16), fontWeight: '800', letterSpacing: 0.5 },
+
+    // Records
+    recordsHeader: {
+      marginTop: ds(8),
+      marginHorizontal: ds(16),
+      marginBottom: ds(12),
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    recordsTitle: {
+      fontSize: ds(10),
+      fontWeight: '800',
+      color: colors.textVariant,
+      textTransform: 'uppercase',
+      letterSpacing: ds(1.5),
+    },
+    logCard: {
+      backgroundColor: colors.surface,
+      borderRadius: ds(18),
+      padding: ds(14),
+      marginHorizontal: ds(16),
+      marginBottom: ds(10),
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      ...Shadows.soft,
+    },
+    logInfo: { flex: 1 },
+    logName: { fontSize: ds(14), fontWeight: '700', color: colors.text },
+    logMeta: { fontSize: ds(11), color: colors.textVariant, opacity: 0.6, marginTop: ds(2) },
+    logBadgeRow: { flexDirection: 'row', gap: ds(6), marginTop: ds(4), flexWrap: 'wrap' },
+    logBadge: {
+      backgroundColor: colors.primary + '12',
+      paddingHorizontal: ds(8),
+      paddingVertical: ds(3),
+      borderRadius: ds(6),
+    },
+    logBadgeText: { fontSize: ds(10), color: colors.primary, fontWeight: '700' },
+
+    // Timer view
+    timerRoot: { flex: 1, justifyContent: 'space-between', paddingBottom: ds(40) },
+    timerHeader: {
+      paddingHorizontal: ds(24),
+      paddingTop: Platform.OS === 'ios' ? ds(80) : ds(44),
+      alignItems: 'center',
+    },
+    sessionTagBadge: {
+      paddingHorizontal: ds(12),
+      paddingVertical: ds(4),
+      borderRadius: ds(20),
+      marginBottom: ds(6),
+    },
+    sessionTagText: { fontSize: ds(10), fontWeight: '800', letterSpacing: ds(1.5) },
+    sessionTitle: {
+      fontSize: ds(20),
+      fontWeight: '800',
+      color: colors.text,
+      textAlign: 'center',
+      letterSpacing: -0.3,
+    },
+
+    // Sprint progress bar
+    progressBarBg: {
+      height: ds(3),
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: ds(2),
+      marginHorizontal: ds(24),
+      // increased spacing from header
+      marginTop: ds(24),
+      overflow: 'hidden',
+    },
+
+    // Center timer section
+    timerCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    ring: {
+      width: ds(270),
+      height: ds(270),
+      borderRadius: ds(135),
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: ds(2),
+      borderColor: colors.surfaceContainer,
+      overflow: 'hidden',
+    },
+    waveRing: {
+      position: 'absolute',
+      width: ds(292),
+      height: ds(292),
+      borderRadius: ds(146),
+      borderWidth: 1.5,
+      borderColor: modeColor + '35',
+    },
+
+    timeText: {
+      fontSize: ds(62),
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: ds(-2),
+      fontVariant: ['tabular-nums'],
+    },
+    phaseText: {
+      fontSize: ds(10),
+      fontWeight: '900',
+      color: currentThemeColor,
+      marginTop: ds(-2),
+      letterSpacing: ds(2.5),
+      textTransform: 'uppercase',
+    },
+
+    breatheOverlay: { position: 'absolute', top: -ds(50), alignItems: 'center' },
+    breatheText: {
+      fontSize: ds(13),
+      fontWeight: '800',
+      color: currentThemeColor,
+      letterSpacing: ds(4),
+      textTransform: 'uppercase',
+    },
+
+    // Controls
+    controlsRoot: { alignItems: 'center', paddingBottom: ds(4) },
+    exitBtn: {
+      width: ds(44),
+      height: ds(44),
+      borderRadius: ds(22),
+      backgroundColor: isDark ? colors.surfaceContainer : '#EBEBF0',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: ds(18),
+    },
+    controlsRow: { flexDirection: 'row', alignItems: 'center', gap: ds(20) },
+    ctrlBtn: {
+      width: ds(52),
+      height: ds(52),
+      borderRadius: ds(26),
+      backgroundColor: isDark ? colors.surfaceContainer : '#EBEBF0',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    playBtn: {
+      width: ds(80),
+      height: ds(80),
+      borderRadius: ds(40),
+      backgroundColor: currentThemeColor,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...Shadows.soft,
+    },
+  });
+
+  // ─── SETUP SCREEN ─────────────────────────────────────────────────────────────
   if (status === 'setup') {
+    const effectiveSprints = isCustomMode
+      ? customSprints
+      : isZenMode
+        ? 1
+        : mode.sprints;
+
     return (
-      <View style={s.root}>
+      <Animated.View
+        style={[s.root, { opacity: setupFade, transform: [{ translateY: setupSlide }] }]}
+      >
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+
         <View style={s.header}>
-          <Text style={s.title}>Focus & Zen</Text>
-          <Text style={s.sub}>Set your focal boundaries.</Text>
+          <Text style={s.title}>Focus</Text>
+          <Text style={s.sub}>Set your intention and begin.</Text>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: ds(60) }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: ds(40) }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Mode selector */}
           <View style={s.card}>
-            <Text style={s.label}>Configurations</Text>
+            <Text style={s.label}>Mode</Text>
             <View style={s.grid}>
-              {MODES.map((m, i) => (
-                <TouchableOpacity 
-                   key={m.id} 
-                   style={[s.gridItem, activeModeIdx === i && s.gridItemActive]} 
-                   onPress={() => { 
-                       setActiveModeIdx(i); 
-                       if (m.id === 'zen') setSessionTag('Zen');
-                       triggerHaptic(Haptics.ImpactFeedbackStyle.Light); 
-                    }}
-                >
-                  <Ionicons name={m.icon as any} size={18} color={activeModeIdx === i ? colors.primary : colors.textVariant} />
-                  <Text style={s.gridItemText}>{m.name}</Text>
-                </TouchableOpacity>
+              {[0, 2].map((rowStart) => (
+                <View key={rowStart} style={s.gridRow}>
+                  {MODES.slice(rowStart, rowStart + 2).map((m, rel) => {
+                    const i = rowStart + rel;
+                    return (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={[s.gridItem, activeModeIdx === i && { ...s.gridItemActive, borderColor: m.color, backgroundColor: m.color + '12' }]}
+                        onPress={() => {
+                          setActiveModeIdx(i);
+                          if (m.id === 'zen') setSessionTag('Zen');
+                          else if (sessionTag === 'Zen') setSessionTag('Work');
+                          triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        activeOpacity={0.78}
+                      >
+                        <View style={s.gridItemRow}>
+                          <Ionicons name={m.icon} size={ds(16)} color={activeModeIdx === i ? m.color : colors.textVariant} />
+                          <Text style={[s.gridItemText, activeModeIdx === i && { color: m.color }]}>{m.name}</Text>
+                        </View>
+                        <Text style={s.gridItemDesc}>{m.desc}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               ))}
             </View>
 
+            {/* Zen duration picker */}
+            {isZenMode && (
+              <View style={{ marginTop: ds(16) }}>
+                <Text style={[s.label, { marginBottom: ds(10) }]}>Duration</Text>
+                <View style={s.zenDurationRow}>
+                  {ZEN_DURATIONS.map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[s.zenChip, zenDuration === d && s.zenChipActive]}
+                      onPress={() => {
+                        setZenDuration(d);
+                        triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <Text
+                        style={[s.zenChipText, zenDuration === d && s.zenChipTextActive]}
+                      >
+                        {d < 60 ? `${d}m` : `${d / 60}h`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Custom fields */}
             {isCustomMode && (
-               <View style={{ flexDirection: 'row', gap: ds(12), marginTop: ds(16) }}>
-                 <View style={{ flex: 1 }}>
-                    <Text style={[s.label, { fontSize: 9, marginBottom: 2 }]}>Focus</Text>
-                    <TextInput style={s.input} keyboardType="numeric" value={customFocus} onChangeText={setCustomFocus} maxLength={3} />
-                 </View>
-                 <View style={{ flex: 1 }}>
-                    <Text style={[s.label, { fontSize: 9, marginBottom: 2 }]}>Break</Text>
-                    <TextInput style={s.input} keyboardType="numeric" value={customBreak} onChangeText={setCustomBreak} maxLength={3} />
-                 </View>
-               </View>
+              <View style={{ marginTop: ds(16) }}>
+                <View style={{ flexDirection: 'row', gap: ds(12), marginBottom: ds(16) }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.label, { marginBottom: ds(6) }]}>Focus (min)</Text>
+                    <TextInput
+                      style={s.input}
+                      keyboardType="numeric"
+                      value={customFocus}
+                      onChangeText={setCustomFocus}
+                      maxLength={3}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.label, { marginBottom: ds(6) }]}>Break (min)</Text>
+                    <TextInput
+                      style={s.input}
+                      keyboardType="numeric"
+                      value={customBreak}
+                      onChangeText={setCustomBreak}
+                      maxLength={3}
+                    />
+                  </View>
+                </View>
+                <Text style={[s.label, { marginBottom: ds(10) }]}>Sprints</Text>
+                <View style={s.sprintRow}>
+                  {SPRINT_COUNT_OPTIONS.map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      style={[s.sprintChip, customSprints === n && s.sprintChipActive]}
+                      onPress={() => {
+                        setCustomSprints(n);
+                        triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          s.sprintChipText,
+                          customSprints === n && s.sprintChipTextActive,
+                        ]}
+                      >
+                        {n}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Sprint info for non-custom, non-zen */}
+            {!isCustomMode && !isZenMode && (
+              <View
+                style={{
+                  marginTop: ds(14),
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: ds(6),
+                }}
+              >
+                <Ionicons name="repeat-outline" size={ds(14)} color={colors.textVariant} />
+                <Text style={{ fontSize: ds(12), color: colors.textVariant, opacity: 0.7 }}>
+                  {mode.sprints} sprints · {mode.focus} min focus · {mode.break} min break
+                </Text>
+              </View>
             )}
           </View>
 
+          {/* Session details */}
           <View style={s.card}>
-            <Text style={s.label}>Primary Intent</Text>
-            <TextInput style={s.input} placeholder={isZenMode ? "Specify Meditative Goal" : "Focus Session Target"} placeholderTextColor={colors.textVariant + '80'} value={sessionName} onChangeText={setSessionName} numberOfLines={1} maxLength={40} />
+            <Text style={s.label}>Session</Text>
+            <TextInput
+              style={s.input}
+              placeholder={
+                isZenMode
+                  ? 'Meditative intention (optional)'
+                  : 'What will you work on?'
+              }
+              placeholderTextColor={colors.textVariant + '70'}
+              value={sessionName}
+              onChangeText={setSessionName}
+              numberOfLines={1}
+              maxLength={50}
+            />
+
+            <Text style={[s.label, { marginTop: ds(16) }]}>Tag</Text>
             <View style={s.tagRow}>
-              {TAGS.map(t => (
-                 <TouchableOpacity key={t} style={[s.tagChip, t === sessionTag && s.tagChipActive]} onPress={() => setSessionTag(t)}>
-                   <Text style={[s.tagText, t === sessionTag && s.tagActiveText]}>{t}</Text>
-                 </TouchableOpacity>
+              {TAGS.map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[
+                    s.tagChip,
+                    t === sessionTag && { ...s.tagChipActive, backgroundColor: modeColor, borderColor: modeColor },
+                  ]}
+                  onPress={() => {
+                    setSessionTag(t);
+                    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <Text style={[s.tagText, t === sessionTag && s.tagActiveText]}>{t}</Text>
+                </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          <TouchableOpacity style={s.mainBtn} onPress={() => { triggerHaptic(); setStatus('focus'); setTimeLeft((isZenMode ? mode.focus : (isCustomMode ? parseInt(customFocus)||25 : mode.focus)) * 60); setTotalTime((isZenMode ? mode.focus : (isCustomMode ? parseInt(customFocus)||25 : mode.focus)) * 60); setIsActive(true); }}>
-            <Text style={s.mainBtnText}>{isZenMode ? "INITIATE ZEN" : "ENGAGE FLOW"}</Text>
+          {/* Start button */}
+          <TouchableOpacity style={s.mainBtn} onPress={startSession} activeOpacity={0.88}>
+            <Text style={s.mainBtnText}>
+              {isZenMode
+                ? `BEGIN ZEN · ${zenDuration < 60 ? `${zenDuration}m` : `${zenDuration / 60}h`}`
+                : `START · ${effectiveSprints} SPRINT${effectiveSprints > 1 ? 'S' : ''}`}
+            </Text>
           </TouchableOpacity>
 
+          {/* Session history */}
           {logs.length > 0 && (
-             <>
-               <View style={s.recordsHeader}>
-                 <Text style={s.recordsTitle}>Flow Records</Text>
-                 <TouchableOpacity onPress={async () => { await AsyncStorage.removeItem('@focus_logs_v2'); setLogs([]); }}>
-                   <Text style={[s.logMeta, { color: colors.error, opacity: 1 }]}>Clear All</Text>
-                 </TouchableOpacity>
-               </View>
-               {logs.map(log => (
-                 <View key={log.id} style={s.logCard}>
-                   <View style={s.logInfo}>
-                     <Text style={s.logName} numberOfLines={1}>{log.name}</Text>
-                     <View style={s.logBadgeRow}>
-                        <View style={[s.logBadge, { backgroundColor: colors.secondary + '10' }]}>
-                            <Text style={[s.logBadgeText, { color: colors.secondary }]}>#{log.tag.toUpperCase()}</Text>
+            <>
+              <View style={s.recordsHeader}>
+                <Text style={s.recordsTitle}>Recent Sessions</Text>
+                <TouchableOpacity
+                  onPress={async () => {
+                    await AsyncStorage.removeItem('@focus_logs_v3');
+                    setLogs([]);
+                  }}
+                >
+                  <Text style={{ fontSize: ds(12), color: colors.error, fontWeight: '700' }}>
+                    Clear
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {logs.map((log) => {
+                const logMode = MODES.find((m) => m.id === log.mode);
+                const logColor = logMode?.color || colors.primary;
+                return (
+                  <View key={log.id} style={s.logCard}>
+                    <View style={s.logInfo}>
+                      <Text style={s.logName} numberOfLines={1}>
+                        {log.name}
+                      </Text>
+                      <View style={s.logBadgeRow}>
+                        <View style={[s.logBadge, { backgroundColor: logColor + '15' }]}>
+                          <Text style={[s.logBadgeText, { color: logColor }]}>
+                            #{log.tag.toUpperCase()}
+                          </Text>
                         </View>
-                        <Text style={s.logMeta}>{new Date(log.timestamp).toLocaleDateString()}</Text>
-                     </View>
-                   </View>
-                   <View style={s.logBadge}>
-                     <Text style={s.logBadgeText}>{log.duration} MIN</Text>
-                   </View>
-                 </View>
-               ))}
-             </>
+                        {log.completedSprints && (
+                          <View style={[s.logBadge, { backgroundColor: logColor + '10' }]}>
+                            <Text style={[s.logBadgeText, { color: logColor }]}>
+                              {log.completedSprints} sprint{log.completedSprints > 1 ? 's' : ''}
+                            </Text>
+                          </View>
+                        )}
+                        <Text style={s.logMeta}>
+                          {new Date(log.timestamp).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: ds(16),
+                        fontWeight: '800',
+                        color: logColor,
+                      }}
+                    >
+                      {log.duration}m
+                    </Text>
+                  </View>
+                );
+              })}
+            </>
           )}
         </ScrollView>
-      </View>
+      </Animated.View>
     );
   }
 
+  // ─── TIMER SCREEN ─────────────────────────────────────────────────────────────
+  const phaseLabel = isZenMode
+    ? 'BREATHING'
+    : status === 'focus'
+      ? 'FOCUSING'
+      : status === 'break'
+        ? 'RECOVERING'
+        : 'DONE';
+
+  const totalSessionMinutes = Math.round(
+    (Date.now() - sessionStartTime) / 60000
+  );
+
   return (
-    <View style={s.root}>
+    <View style={[s.root]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <LinearGradient colors={isDark ? [colors.background, '#12121A'] : ['#FFF', colors.background]} style={StyleSheet.absoluteFill} />
 
-      <View style={s.header}>
-        <View style={{ alignItems: 'center' }}>
-            <View style={{ backgroundColor: currentThemeColor + '15', paddingHorizontal: ds(12), paddingVertical: ds(4), borderRadius: ds(20), marginBottom: ds(4) }}>
-                <Text style={{ ...Typography.caption, color: currentThemeColor, fontWeight: '800', fontSize: ds(11) }}>{sessionTag.toUpperCase()}</Text>
+      {/* Soft background gradient */}
+      <LinearGradient
+        colors={
+          isDark
+            ? [colors.background, modeColor + '0A']
+            : ['#FFFFFF', modeColor + '08']
+        }
+        style={StyleSheet.absoluteFill}
+      />
+
+      <Animated.View
+        style={[
+          s.timerRoot,
+          {
+            opacity: fadeIn,
+            transform: [{ translateY: slideUp }],
+          },
+        ]}
+      >
+        {/* Header */}
+        <Animated.View
+          style={[
+            s.timerHeader,
+            {
+              opacity: headerFade,
+              transform: [{ translateY: headerSlide }],
+            },
+          ]}
+        >
+          <View
+            style={[
+              s.sessionTagBadge,
+              { backgroundColor: currentThemeColor + '15' },
+            ]}
+          >
+            <Text style={[s.sessionTagText, { color: currentThemeColor }]}>
+              {sessionTag.toUpperCase()} · {phaseLabel}
+            </Text>
+          </View>
+          <Text style={s.sessionTitle} numberOfLines={1} ellipsizeMode="tail">
+            {sessionName || (isZenMode ? 'Zen Meditation' : 'Focus Session')}
+          </Text>
+        </Animated.View>
+
+        {/* Sprint progress bar */}
+        {totalSprints > 1 && (
+          <>
+            <View style={s.progressBarBg}>
+              <Animated.View
+                style={{
+                  height: '100%',
+                  width: `${sprintProgress}%`,
+                  backgroundColor: currentThemeColor,
+                  borderRadius: ds(2),
+                }}
+              />
             </View>
-            <Text style={[s.title, { fontSize: ds(22) }]} numberOfLines={1} ellipsizeMode="tail">
-                {sessionName || (isZenMode ? 'Zen Meditation' : 'Primal Focus')}
-            </Text>
-        </View>
-      </View>
+            <SprintDots
+              total={totalSprints}
+              completed={completedSprints}
+              current={currentSprint}
+              color={currentThemeColor}
+            />
+          </>
+        )}
 
-      <View style={s.container}>
-         {/* FLUID WATER ANIMATION (OUTER RING) */}
-         {status === 'focus' && isActive && (
-           <Animated.View style={[s.waveRing, { transform: [{ scale: wavyPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) }], opacity: wavyPulse.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.6, 0.2, 0.6] }) } ]} />
-         )}
+        {/* Timer ring */}
+        <View style={s.timerCenter}>
+          {/* Outer wave ring */}
+          {status === 'focus' && isActive && (
+            <Animated.View
+              style={[
+                s.waveRing,
+                {
+                  transform: [
+                    {
+                      scale: wavyPulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1, 1.12],
+                      }),
+                    },
+                  ],
+                  opacity: wavyPulse.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [0.5, 0.15, 0.5],
+                  }),
+                },
+              ]}
+            />
+          )}
 
-         {isActive && (
-           <Animated.View style={[s.overlay, { opacity: breatheOpacity }]}>
-             <Text style={[s.overlayText, { color: currentThemeColor }]}>{breatheLabel}</Text>
-           </Animated.View>
-         )}
+          {/* Second outer ring */}
+          {status === 'focus' && isActive && (
+            <Animated.View
+              style={{
+                position: 'absolute',
+                width: ds(310),
+                height: ds(310),
+                borderRadius: ds(155),
+                borderWidth: 1,
+                borderColor: modeColor + '20',
+                transform: [
+                  {
+                    scale: wavyPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1.05, 1.2],
+                    }),
+                  },
+                ],
+                opacity: wavyPulse.interpolate({
+                  inputRange: [0, 0.5, 1],
+                  outputRange: [0.3, 0.1, 0.3],
+                }),
+              }}
+            />
+          )}
 
-         <Animated.View style={[s.ring, { transform: [{ scale: pulseAnim }], borderColor: currentThemeColor + '20' }]}>
-            <View style={[s.fill, { height: `${percent}%` as DimensionValue, backgroundColor: currentThemeColor + '10' }]} />
+          {/* Breathe label above ring */}
+          {isActive && (
+            <Animated.View style={[s.breatheOverlay, { opacity: breatheOpacity }]}>
+              <Text style={s.breatheText}>{breatheLabel}</Text>
+            </Animated.View>
+          )}
+
+          {/* Main timer ring */}
+          <Animated.View
+            style={[
+              s.ring,
+              {
+                transform: [{ scale: Animated.multiply(pulseAnim, timerScale) }],
+                borderColor: currentThemeColor + '25',
+              },
+            ]}
+          >
+            {/* Water fill animation */}
+            <WaterFill
+              percent={percent}
+              color={currentThemeColor}
+              isActive={isActive}
+            />
+
             <Text style={s.timeText}>{formatTime(timeLeft)}</Text>
-            <Text style={[s.phaseText, { color: currentThemeColor }]}>
-                {isZenMode ? 'MEDITATING' : (status === 'focus' ? 'CONCENTRATING' : 'RECOVERING')}
-            </Text>
-         </Animated.View>
+            <Text style={s.phaseText}>{phaseLabel}</Text>
 
-         <View style={s.controlsRoot}>
-            <TouchableOpacity style={s.exitBtn} onPress={() => { triggerHaptic(); setStatus('setup'); setIsActive(false); }}>
-               <Ionicons name="close-outline" size={ds(32)} color={colors.text} />
+            {/* Sprint label inside ring */}
+            {totalSprints > 1 && (
+              <Text
+                style={{
+                  fontSize: ds(10),
+                  color: colors.textVariant,
+                  opacity: 0.55,
+                  marginTop: ds(4),
+                  fontWeight: '700',
+                  letterSpacing: ds(1),
+                }}
+              >
+                SPRINT {currentSprint + 1} / {totalSprints}
+              </Text>
+            )}
+          </Animated.View>
+        </View>
+
+        {/* Controls */}
+        <View style={s.controlsRoot}>
+          <TouchableOpacity
+            style={s.exitBtn}
+            onPress={() => {
+              triggerHaptic();
+              setStatus('setup');
+              setIsActive(false);
+              setCompletedSprints(0);
+              setCurrentSprint(0);
+            }}
+          >
+            <Ionicons name="close-outline" size={ds(26)} color={colors.textVariant} />
+          </TouchableOpacity>
+
+          <View style={s.controlsRow}>
+            {/* Reset current phase */}
+            <TouchableOpacity
+              style={s.ctrlBtn}
+              onPress={() => {
+                triggerHaptic();
+                setTimeLeft(totalTime);
+              }}
+            >
+              <Ionicons name="refresh-outline" size={ds(22)} color={colors.textVariant} />
             </TouchableOpacity>
 
-            <View style={s.controlsRow}>
-                <TouchableOpacity style={s.ctrlBtn} onPress={() => { triggerHaptic(); setTimeLeft(totalTime); }}>
-                   <Ionicons name="refresh-outline" size={ds(24)} color={colors.textVariant} />
-                </TouchableOpacity>
+            {/* Play/Pause */}
+            <RippleBtn
+              style={[s.playBtn, { backgroundColor: currentThemeColor }]}
+              onPress={() => {
+                triggerHaptic();
+                setIsActive(!isActive);
+              }}
+            >
+              <Ionicons
+                name={isActive ? 'pause' : 'play'}
+                size={ds(36)}
+                color="#fff"
+              />
+            </RippleBtn>
 
-                <TouchableOpacity style={[s.playBtn, { backgroundColor: currentThemeColor }]} onPress={() => { triggerHaptic(); setIsActive(!isActive); }}>
-                   <Ionicons name={isActive ? "pause" : "play"} size={ds(40)} color="#FFF" />
-                </TouchableOpacity>
+            {/* Skip phase */}
+            <TouchableOpacity style={s.ctrlBtn} onPress={skipPhase}>
+              <Ionicons
+                name="play-skip-forward-outline"
+                size={ds(22)}
+                color={colors.textVariant}
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Animated.View>
 
-                <TouchableOpacity style={s.ctrlBtn} onPress={skipPhase}>
-                   <Ionicons name="play-skip-forward-outline" size={ds(24)} color={colors.textVariant} />
-                </TouchableOpacity>
-            </View>
-         </View>
-      </View>
+      {/* Completion modal */}
+      <CelebrationOverlay
+        visible={showComplete}
+        onDismiss={handleCompleteSession}
+        completedSprints={completedSprints}
+        sessionName={sessionName || (isZenMode ? 'Zen Meditation' : 'Focus Session')}
+        modeColor={modeColor}
+        totalMinutes={totalSessionMinutes}
+      />
     </View>
   );
 }
