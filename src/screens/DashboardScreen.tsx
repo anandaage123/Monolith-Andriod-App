@@ -23,6 +23,7 @@ import { useNavigation, NavigationProp, useIsFocused } from '@react-navigation/n
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import { MM_Colors, Typography, Shadows, Spacing } from '../theme/Theme';
+import { APP_VERSION, APP_BUILD } from '../services/UpdateService';
 
 const { width } = Dimensions.get('window');
 
@@ -364,7 +365,7 @@ export default function DashboardScreen() {
 
             <View style={styles.greetingSection}>
               <Text style={styles.dateLabel}>{today}</Text>
-              <Text style={styles.greetingTitle}>Rise & Execute, Hero.</Text>
+              <Text style={styles.greetingTitle}>Rise & Execute.</Text>
               <Text style={styles.greetingSub}>
                 {habits.filter(h => h.completed).length > 0
                   ? `${habits.filter(h => h.completed).length} of ${habits.length} rituals crushed today. Keep the streak alive.`
@@ -493,7 +494,12 @@ export default function DashboardScreen() {
           </View>
         ))}
 
-        <View style={{ height: 100 }} />
+        <View style={{ paddingVertical: 40, alignItems: 'center', opacity: 0.3 }}>
+          <Text style={{ ...Typography.caption, color: MM_Colors.textVariant }}>
+            MONOLITH {APP_VERSION} (BUILD {APP_BUILD})
+          </Text>
+        </View>
+        <View style={{ height: 60 }} />
       </ScrollView>
 
       <Pressable

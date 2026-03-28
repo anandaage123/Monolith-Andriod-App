@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { StatusBar, View, Text, Animated, StyleSheet, Easing, Dimensions, Platform } from 'react-native';
+import { StatusBar, View, Text, Animated, StyleSheet, Easing, Dimensions, Platform, AppState } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
 import UpdateModal from './src/components/UpdateModal';
 import { checkForUpdates, VersionManifest } from './src/services/UpdateService';
@@ -109,7 +109,20 @@ export default function App() {
       });
     }, 4500);
 
-    return () => clearTimeout(timer);
+    // 4. Background/Foreground listener
+    const subscription = AppState.addEventListener('change', async (nextState) => {
+      if (nextState === 'active') {
+        try {
+          const manifest = await checkForUpdates();
+          if (manifest) setUpdateManifest(manifest);
+        } catch (_) {}
+      }
+    });
+
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
   }, []);
 
   if (showSplash) {

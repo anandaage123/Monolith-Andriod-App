@@ -16,8 +16,8 @@ const VERSION_JSON_URL =
   'https://raw.githubusercontent.com/anandaage123/daily-app/master/version.json';
 
 // These values MUST match app.json & version.json — release.sh keeps them in sync
-export const APP_VERSION = '2.1.8';
-export const APP_BUILD = 6;
+export const APP_VERSION = '2.2.0';
+export const APP_BUILD = 7;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface VersionManifest {
@@ -64,16 +64,33 @@ export async function checkForUpdates(): Promise<VersionManifest | null> {
     const res = await fetch(VERSION_JSON_URL, {
       headers: { 'Cache-Control': 'no-cache' },
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[UpdateService] Manifest fetch failed with status: ${res.status}`);
+      return null;
+    }
 
     const manifest: VersionManifest = await res.json();
+    const remoteBuild = manifest.build || manifest.versionCode || 0;
 
-    // Force update: our build is below the minimum required
-    if (manifest.minBuildRequired > APP_BUILD) return manifest;
+    // 1. Force update check (mandatory build requirement)
+    if (manifest.minBuildRequired > APP_BUILD) {
+      console.log(`[UpdateService] Update required: minBuildRequired ${manifest.minBuildRequired} > APP_BUILD ${APP_BUILD}`);
+      return manifest;
+    }
 
-    // Standard semver bump check
-    if (isNewerVersion(APP_VERSION, manifest.version)) return manifest;
+    // 2. Semantic version check ("2.1.8" > "2.1.7")
+    if (isNewerVersion(APP_VERSION, manifest.version)) {
+      console.log(`[UpdateService] New version found: ${manifest.version} > ${APP_VERSION}`);
+      return manifest;
+    }
 
+    // 3. Build number check (Same version but NEWER BUILD)
+    if (manifest.version === APP_VERSION && remoteBuild > APP_BUILD) {
+      console.log(`[UpdateService] New build found: ${APP_VERSION} #${remoteBuild} > #${APP_BUILD}`);
+      return manifest;
+    }
+
+    console.log(`[UpdateService] Already up to date: local ${APP_VERSION}#${APP_BUILD}, remote ${manifest.version}#${remoteBuild}`);
     return null;
   } catch (e) {
     console.warn('[UpdateService] Could not check for updates:', e);

@@ -233,6 +233,14 @@ sed -i '' "s/export const APP_BUILD = [0-9]*;/export const APP_BUILD = ${NEW_BUI
   src/services/UpdateService.ts
 success "UpdateService.ts → APP_VERSION '${NEW_VERSION}', APP_BUILD ${NEW_BUILD}"
 
+# android/app/build.gradle (Native versioning)
+GRADLE_FILE="android/app/build.gradle"
+if [[ -f "$GRADLE_FILE" ]]; then
+  sed -i '' "s/versionCode [0-9]*/versionCode ${NEW_BUILD}/" "$GRADLE_FILE"
+  sed -i '' "s/versionName \".*\"/versionName \"${NEW_VERSION}\"/" "$GRADLE_FILE"
+  success "build.gradle → versionName \"${NEW_VERSION}\", versionCode ${NEW_BUILD}"
+fi
+
 echo ""
 
 # ─── Step 7: Build release APK ───────────────────────────────────────────────
