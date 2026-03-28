@@ -1,11 +1,11 @@
 {
-  "version": "2.3.5",
-  "build": 16,
-  "versionCode": 16,
+  "version": "3.0.0",
+  "build": 17,
+  "versionCode": 17,
   "releaseDate": "2026-03-28",
-  "releaseNotes": "\u2022 Full app rebrand to Daily Hub\n\u2022 Removed legacy Muse terminology\n\u2022 Switched to Journal and Entry naming\n\u2022 UI cleanup and accessibility fixes",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v2.3.5/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v2.3.5",
+  "releaseNotes": "\u2022 \ud83d\udee0\ufe0f UI Stability & Logic Fixes\n\u2022 Stable Tag Selection: I fixed a layout bug where selecting an interest would \"enlarge\" the tag unpredictably. By implementing proper style merging, the tags now maintain their base padding and grid alignment upon selection, providing stable visual feedback without disrupting the UI.\n\u2022 Engine Restoration: I have re-implemented the",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.0.0/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.0.0",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
