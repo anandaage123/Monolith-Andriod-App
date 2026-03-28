@@ -1,11 +1,11 @@
 {
-  "version": "3.0.0",
-  "build": 17,
-  "versionCode": 17,
-  "releaseDate": "2026-03-28",
-  "releaseNotes": "\u2022 \ud83d\udee0\ufe0f UI Stability & Logic Fixes\n\u2022 Stable Tag Selection: I fixed a layout bug where selecting an interest would \"enlarge\" the tag unpredictably. By implementing proper style merging, the tags now maintain their base padding and grid alignment upon selection, providing stable visual feedback without disrupting the UI.\n\u2022 Engine Restoration: I have re-implemented the",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.0.0/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.0.0",
+  "version": "3.1.0",
+  "build": 18,
+  "versionCode": 18,
+  "releaseDate": "2026-03-29",
+  "releaseNotes": "\u2022 Updates\n\u2022 UI improvisations for Focus screen",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.1.0/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.1.0",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
