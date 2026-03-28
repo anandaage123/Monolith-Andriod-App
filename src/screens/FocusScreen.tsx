@@ -13,11 +13,13 @@ import {
   Platform,
   Vibration,
   Dimensions,
-  StatusBar
+  StatusBar,
+  AppState
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
+import { useKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { MM_Colors, Typography, Shadows, Spacing } from '../theme/Theme';
@@ -33,6 +35,12 @@ export default function FocusScreen() {
   const [totalTime, setTotalTime] = useState(25 * 60);
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  
+  const appState = useRef(AppState.currentState);
+  const startTimeRef = useRef<number | null>(null);
+
+  useKeepAwake(); // Keep screen on while this screen is focused
 
   const workPlayer = useAudioPlayer(require('../../assets/timer_end.wav'));
   const breakPlayer = useAudioPlayer(require('../../assets/timer_end.wav'));
@@ -64,6 +72,27 @@ export default function FocusScreen() {
       if (b) setCustomBreakMin(b);
     } catch (e) {}
   };
+
+  // Background timer logic
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (appState.current.match(/active/) && nextAppState === 'background') {
+        if (isActive) {
+          startTimeRef.current = Date.now();
+        }
+      } else if (appState.current.match(/background/) && nextAppState === 'active') {
+        if (isActive && startTimeRef.current) {
+          const now = Date.now();
+          const elapsed = Math.floor((now - startTimeRef.current) / 1000);
+          setTimeLeft(prev => Math.max(0, prev - elapsed));
+          startTimeRef.current = null;
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => subscription.remove();
+  }, [isActive]);
 
   useEffect(() => {
     if (isActive) {
@@ -211,7 +240,17 @@ export default function FocusScreen() {
 
       <View style={styles.headerBar}>
         <Text style={styles.logoText}>Deep Focus</Text>
-        <Pressable onPress={() => setShowCustomModal(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+        <Pressable 
+          onPress={() => setIsLocked(!isLocked)} 
+          style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.7 : 1, marginRight: 16 }]}
+        >
+          <Ionicons name={isLocked ? "lock-closed" : "lock-open-outline"} size={22} color={isLocked ? MM_Colors.error : MM_Colors.primary} />
+        </Pressable>
+        <Pressable 
+          disabled={isLocked}
+          onPress={() => setShowCustomModal(true)} 
+          style={({ pressed }) => [{ opacity: pressed || isLocked ? 0.5 : 1 }]}
+        >
           <Ionicons name="options-outline" size={24} color={MM_Colors.primary} />
         </Pressable>
       </View>
@@ -375,4 +414,8 @@ const styles = StyleSheet.create({
   input: { backgroundColor: MM_Colors.background, width: '100%', padding: 16, borderRadius: 12, ...Typography.header, fontSize: 32, textAlign: 'center' },
   saveBtn: { backgroundColor: MM_Colors.primary, width: '100%', padding: 16, borderRadius: 12, alignItems: 'center' },
   saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
+  headerBtn: { padding: 8, borderRadius: 12, backgroundColor: MM_Colors.white, ...Shadows.soft },
+  lockOverlay: { marginTop: 32, alignItems: 'center' },
+  lockText: { ...Typography.title, color: MM_Colors.error, marginTop: 12 },
+  lockSubText: { ...Typography.caption, marginTop: 4, opacity: 0.6 },
 });

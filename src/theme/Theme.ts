@@ -1,30 +1,57 @@
 import { Platform } from 'react-native';
 
 export const MM_Colors = {
-  primary: '#007AFF', // iOS Blue
-  primaryLight: '#5856D6', // iOS Purple
-  background: '#F2F2F7', // iOS System Gray 6
+  primary: '#4052B6', // Royal Muse Blue
+  primaryLight: '#8899FF',
+  background: '#F9F5FF', // Soft UI background
   surface: '#FFFFFF',
-  surfaceContainer: '#E5E5EA', // iOS System Gray 4
-  surfaceContainerHigh: '#D1D1D6', // iOS System Gray 3
-  surfaceContainerLow: '#F2F2F7',
+  surfaceContainer: '#F0EFFF', 
+  surfaceContainerHigh: '#E0DEFF',
+  surfaceContainerLow: '#FFFFFF',
   surfaceContainerLowest: '#FFFFFF',
-  text: '#000000',
-  textVariant: '#3C3C43', // iOS Secondary Label (60% opacity)
-  outlineVariant: '#C6C6C8', // iOS System Gray 2
-  onBackground: '#000000',
-  onSurface: '#000000',
-  onSurfaceVariant: '#3C3C43',
-  primaryDim: '#0056b3',
-  secondary: '#FF9500', // iOS Orange
-  secondaryContainer: '#FFCC00', // iOS Yellow
-  onSecondaryContainer: '#000000',
-  tertiary: '#34C759', // iOS Green
+  text: '#2C2A51', // Deep Slate
+  textVariant: '#5D5A88', 
+  outlineVariant: '#C6C6C8',
+  onBackground: '#2C2A51',
+  onSurface: '#2C2A51',
+  onSurfaceVariant: '#5D5A88',
+  primaryDim: '#303F9F',
+  secondary: '#765600', // Gold
+  secondaryContainer: '#FFF1CC', 
+  onSecondaryContainer: '#765600',
+  tertiary: '#006947', // Green
   tertiaryContainer: '#E5F9E7',
   onTertiaryContainer: '#1E7D32',
-  error: '#FF3B30', // iOS Red
+  error: '#B41340', // Ruby
   white: '#FFFFFF',
-  primaryContainer: '#007AFF',
+  primaryContainer: '#4052B6',
+};
+
+export const Dark_Colors = {
+  primary: '#8899FF', // Lighter for legibility on dark
+  primaryLight: '#AABBFF',
+  background: '#0F0E17',
+  surface: '#1A1826',
+  surfaceContainer: '#242233',
+  surfaceContainerHigh: '#2F2C45',
+  surfaceContainerLow: '#1A1826',
+  surfaceContainerLowest: '#0F0E17',
+  text: '#F2F2F2',
+  textVariant: '#B0ADC9',
+  outlineVariant: '#3C3A5A',
+  onBackground: '#F2F2F2',
+  onSurface: '#F2F2F2',
+  onSurfaceVariant: '#B0ADC9',
+  primaryDim: '#4052B6',
+  secondary: '#FFCC00', // Gold pop
+  secondaryContainer: '#332900',
+  onSecondaryContainer: '#FFCC00',
+  tertiary: '#4ADE80',
+  tertiaryContainer: '#002C1E',
+  onTertiaryContainer: '#4ADE80',
+  error: '#FF4D6D',
+  white: '#FFFFFF',
+  primaryContainer: '#4052B6',
 };
 
 export const Colors = MM_Colors;
@@ -70,9 +97,16 @@ export const Shadows = {
   soft: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  dark: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
     shadowRadius: 12,
-    elevation: 4, // for android fallback
+    elevation: 8,
   }
 };
 

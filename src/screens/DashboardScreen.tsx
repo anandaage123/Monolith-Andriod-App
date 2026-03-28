@@ -22,8 +22,9 @@ import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-ic
 import { useNavigation, NavigationProp, useIsFocused } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import { MM_Colors, Typography, Shadows, Spacing } from '../theme/Theme';
+import { Typography, Shadows, Spacing } from '../theme/Theme';
 import { APP_VERSION, APP_BUILD } from '../services/UpdateService';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -60,6 +61,87 @@ interface Habit {
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp<any>>();
   const isFocused = useIsFocused();
+  const { colors, isDark, setThemeMode } = useTheme();
+
+  const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    scrollContent: { padding: Spacing.padding, paddingTop: Platform.OS === 'ios' ? 70 : (StatusBar.currentHeight || 0) + 20 },
+
+    headerBlock: { marginBottom: 32 },
+    topHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    logoText: { ...Typography.title, color: colors.primary, fontWeight: '800' },
+    headerBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
+
+    greetingSection: {},
+    dateLabel: { ...Typography.caption, fontWeight: '700', color: colors.textVariant, letterSpacing: 1.5, marginBottom: 8, textTransform: 'uppercase' },
+    greetingTitle: { ...Typography.header, color: colors.text, letterSpacing: -1.5, lineHeight: 40 },
+    greetingSub: { ...Typography.body, color: colors.textVariant, marginTop: 12, maxWidth: '90%' },
+
+    quoteCardWrapper: { marginBottom: 40 },
+    quoteCard: { width: '100%', borderRadius: 24, ...Shadows.soft, overflow: 'hidden' },
+    quoteGradient: { padding: 24 },
+    quoteText: { ...Typography.title, color: '#FFFFFF', lineHeight: 28 },
+    quoteAuthor: { ...Typography.body, color: '#FFFFFF', opacity: 0.8, marginTop: 12, fontSize: 15 },
+
+    ritualsContainer: { marginBottom: 40 },
+    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 20 },
+    sectionTitle: { ...Typography.header, fontSize: 24, color: colors.text },
+    sectionBadge: { ...Typography.caption, color: colors.primary, fontWeight: '800' },
+
+    habitsGrid: { gap: 12 },
+    habitItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      padding: 16,
+      borderRadius: Spacing.borderRadius,
+      ...Shadows.soft,
+    },
+    habitItemCompleted: { opacity: 0.6 },
+    habitMain: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: colors.surfaceContainer, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
+    habitIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    habitName: { ...Typography.body, fontWeight: '600', color: colors.text },
+    habitNameCompleted: { textDecorationLine: 'line-through', color: colors.textVariant },
+    habitMeta: { ...Typography.caption, color: colors.textVariant, marginTop: 1 },
+    deleteBtn: { padding: 4 },
+
+    weatherCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 20, marginBottom: 40, ...Shadows.soft },
+    weatherContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    weatherLoadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
+    loadingText: { ...Typography.caption, color: colors.primary },
+    cityText: { ...Typography.title, fontSize: 18, color: colors.text },
+    weatherStatus: { ...Typography.caption, color: colors.textVariant, marginTop: 2 },
+    tempRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 12 },
+    tempText: { ...Typography.header, fontSize: 44, color: colors.text },
+    tempUnit: { ...Typography.title, marginLeft: 2, color: colors.textVariant },
+
+    metricsCard: { backgroundColor: colors.surface, borderRadius: 24, padding: 24, marginBottom: 20, ...Shadows.soft },
+    metricsTitle: { ...Typography.title, color: colors.text, marginBottom: 20 },
+    metricRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
+    metricLabel: { ...Typography.body, fontSize: 15, color: colors.textVariant },
+    metricValue: { ...Typography.body, color: colors.text, fontWeight: '700' },
+    progressBg: { height: 6, backgroundColor: colors.background, borderRadius: 3, overflow: 'hidden' },
+    progressFill: { height: '100%', borderRadius: 3 },
+    metricsFooter: { flexDirection: 'row', marginTop: 24 },
+    primaryBtn: { flex: 1, height: 50, borderRadius: 25, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
+    primaryBtnText: { color: '#FFF', fontWeight: '700', letterSpacing: 0.5 },
+
+    fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, ...Shadows.soft },
+    fabInner: { width: '100%', height: '100%', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: { backgroundColor: colors.surface, borderRadius: 20, padding: 24, width: '100%', ...Shadows.soft },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { ...Typography.title, color: colors.text },
+    label: { ...Typography.caption, color: colors.textVariant, fontWeight: '700', marginBottom: 12, marginTop: 12 },
+    input: { borderBottomWidth: 1, borderBottomColor: colors.surfaceContainer, color: colors.text, paddingVertical: 8, ...Typography.body, marginBottom: 24 },
+    iconPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+    iconBox: { width: 44, height: 44, borderRadius: 10, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+    iconBoxSelected: { backgroundColor: colors.primary },
+    saveBtn: { backgroundColor: colors.primary, padding: 16, borderRadius: 12, alignItems: 'center' },
+    saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
+  });
 
   // State
   const [habits, setHabits] = useState<Habit[]>([]);
@@ -347,7 +429,7 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={MM_Colors.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
 
@@ -383,7 +465,7 @@ export default function DashboardScreen() {
               {...panResponder.panHandlers}
               style={[styles.quoteCard, { transform: [{ translateX: quoteTranslateX }] }]}
             >
-              <LinearGradient colors={[MM_Colors.primary, MM_Colors.primaryLight]} style={styles.quoteGradient}>
+              <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.quoteGradient}>
                 <MaterialCommunityIcons name="format-quote-open" size={40} color="rgba(255,255,255,0.3)" />
                 <Text style={styles.quoteText}>{quote.text}</Text>
                 <Text style={styles.quoteAuthor}>— {quote.author}</Text>
@@ -411,11 +493,11 @@ export default function DashboardScreen() {
                     onLongPress={() => deleteHabit(habit.id)}
                   >
                     <View style={styles.habitMain}>
-                      <View style={[styles.checkbox, habit.completed && { backgroundColor: MM_Colors.primary, borderColor: MM_Colors.primary }]}>
-                        {habit.completed && <Ionicons name="checkmark" size={18} color={MM_Colors.white} />}
+                      <View style={[styles.checkbox, habit.completed && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+                        {habit.completed && <Ionicons name="checkmark" size={18} color={colors.white} />}
                       </View>
                       <View style={styles.habitIconContainer}>
-                        {renderHabitIcon(habit.iconName, habit.iconType, MM_Colors.primary)}
+                        {renderHabitIcon(habit.iconName, habit.iconType, colors.primary)}
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.habitName, habit.completed && styles.habitNameCompleted]}>{habit.name}</Text>
@@ -423,7 +505,7 @@ export default function DashboardScreen() {
                       </View>
                     </View>
                     <Pressable onPress={() => deleteHabit(habit.id)} style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.7 : 1 }]}>
-                      <Ionicons name="close" size={18} color={MM_Colors.textVariant} />
+                      <Ionicons name="close" size={18} color={colors.textVariant} />
                     </Pressable>
                   </Pressable>
                 </Animated.View>
@@ -441,7 +523,7 @@ export default function DashboardScreen() {
             <View style={styles.weatherContent}>
               {isWeatherLoading && !weather ? (
                 <View style={styles.weatherLoadingContainer}>
-                  <ActivityIndicator color={MM_Colors.primary} size="small" />
+                  <ActivityIndicator color={colors.primary} size="small" />
                   <Text style={styles.loadingText}>Sensing Atmosphere...</Text>
                 </View>
               ) : (
@@ -449,7 +531,7 @@ export default function DashboardScreen() {
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={styles.cityText}>{weather?.desc || 'Atmosphere'}</Text>
-                      <Ionicons name="location" size={18} color={MM_Colors.primary} />
+                      <Ionicons name="location" size={18} color={colors.primary} />
                     </View>
                     <Text style={styles.weatherStatus}>{weather?.status || 'Setting focus...'}</Text>
                     <View style={styles.tempRow}>
@@ -457,7 +539,7 @@ export default function DashboardScreen() {
                       <Text style={styles.tempUnit}>C</Text>
                     </View>
                   </View>
-                  <Ionicons name={weather?.icon || "cloud-outline"} size={48} color={MM_Colors.secondary} />
+                  <Ionicons name={weather?.icon || "cloud-outline"} size={48} color={colors.secondary} />
                 </>
               )}
             </View>
@@ -472,15 +554,15 @@ export default function DashboardScreen() {
               <Text style={styles.metricValue}>{completionRate}%</Text>
             </View>
             <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${completionRate}%`, backgroundColor: MM_Colors.primary }]} />
+              <View style={[styles.progressFill, { width: `${completionRate}%`, backgroundColor: colors.primary }]} />
             </View>
 
             <View style={[styles.metricRow, { marginTop: 20 }]}>
               <Text style={styles.metricLabel}>Budget Health</Text>
-              <Text style={[styles.metricValue, { color: budgetHealth.status === 'Critical' ? MM_Colors.error : (budgetHealth.status === 'Warning' ? MM_Colors.secondary : MM_Colors.tertiary) }]}>{budgetHealth.label}</Text>
+              <Text style={[styles.metricValue, { color: budgetHealth.status === 'Critical' ? colors.error : (budgetHealth.status === 'Warning' ? colors.secondary : colors.tertiary) }]}>{budgetHealth.label}</Text>
             </View>
             <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${budgetHealth.percentage}%`, backgroundColor: budgetHealth.status === 'Critical' ? MM_Colors.error : MM_Colors.tertiary }]} />
+              <View style={[styles.progressFill, { width: `${budgetHealth.percentage}%`, backgroundColor: budgetHealth.status === 'Critical' ? colors.error : colors.tertiary }]} />
             </View>
 
             <View style={styles.metricsFooter}>
@@ -495,7 +577,7 @@ export default function DashboardScreen() {
         ))}
 
         <View style={{ paddingVertical: 40, alignItems: 'center', opacity: 0.3 }}>
-          <Text style={{ ...Typography.caption, color: MM_Colors.textVariant }}>
+          <Text style={{ ...Typography.caption, color: colors.textVariant }}>
             MONOLITH {APP_VERSION} (BUILD {APP_BUILD})
           </Text>
         </View>
@@ -506,7 +588,7 @@ export default function DashboardScreen() {
         style={({ pressed }) => [styles.fab, { opacity: pressed ? 0.7 : 1 }]}
         onPress={() => setIsAddingHabit(true)}
       >
-        <LinearGradient colors={[MM_Colors.primary, MM_Colors.primaryLight]} style={styles.fabInner}>
+        <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.fabInner}>
           <Ionicons name="add" size={32} color="#FFF" />
         </LinearGradient>
       </Pressable>
@@ -517,13 +599,13 @@ export default function DashboardScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>New Ritual</Text>
               <Pressable onPress={() => setIsAddingHabit(false)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-                <Ionicons name="close" size={24} color={MM_Colors.textVariant} />
+                <Ionicons name="close" size={24} color={colors.textVariant} />
               </Pressable>
             </View>
             <TextInput
               style={styles.input}
               placeholder="e.g. Morning Meditation"
-              placeholderTextColor={MM_Colors.textVariant}
+              placeholderTextColor={colors.textVariant}
               value={newHabitName}
               onChangeText={setNewHabitName}
               autoFocus
@@ -541,7 +623,7 @@ export default function DashboardScreen() {
                   ]}
                   onPress={() => setSelectedIcon(icon)}
                 >
-                  {renderHabitIcon(icon.name, icon.type, selectedIcon.name === icon.name ? MM_Colors.white : MM_Colors.primary)}
+                  {renderHabitIcon(icon.name, icon.type, selectedIcon.name === icon.name ? colors.white : colors.primary)}
                 </Pressable>
               ))}
             </View>
@@ -560,81 +642,4 @@ export default function DashboardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: MM_Colors.background },
-  scrollContent: { padding: Spacing.padding, paddingTop: Platform.OS === 'ios' ? 70 : (StatusBar.currentHeight || 0) + 20 },
 
-  headerBlock: { marginBottom: 32 },
-  topHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  logoText: { ...Typography.title, color: MM_Colors.primary, fontWeight: '800' },
-
-  greetingSection: {},
-  dateLabel: { ...Typography.caption, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8, textTransform: 'uppercase' },
-  greetingTitle: { ...Typography.header, letterSpacing: -1.5, lineHeight: 40 },
-  greetingSub: { ...Typography.body, color: MM_Colors.textVariant, marginTop: 12, maxWidth: '90%' },
-
-  quoteCardWrapper: { marginBottom: 40 },
-  quoteCard: { width: '100%', borderRadius: 24, ...Shadows.soft, overflow: 'hidden' },
-  quoteGradient: { padding: 24 },
-  quoteText: { ...Typography.title, color: MM_Colors.white, lineHeight: 28 },
-  quoteAuthor: { ...Typography.body, color: MM_Colors.white, opacity: 0.8, marginTop: 12, fontSize: 15 },
-
-  ritualsContainer: { marginBottom: 40 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 20 },
-  sectionTitle: { ...Typography.header, fontSize: 24 },
-  sectionBadge: { ...Typography.caption, color: MM_Colors.primary, fontWeight: '800' },
-
-  habitsGrid: { gap: 12 },
-  habitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: MM_Colors.white,
-    padding: 16,
-    borderRadius: Spacing.borderRadius,
-    ...Shadows.soft,
-  },
-  habitItemCompleted: { opacity: 0.6 },
-  habitMain: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: MM_Colors.surfaceContainer, marginRight: 12, justifyContent: 'center', alignItems: 'center' },
-  habitIconContainer: { width: 40, height: 40, borderRadius: 10, backgroundColor: MM_Colors.background, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  habitName: { ...Typography.body, fontWeight: '600' },
-  habitNameCompleted: { textDecorationLine: 'line-through', color: MM_Colors.textVariant },
-  habitMeta: { ...Typography.caption, marginTop: 1 },
-  deleteBtn: { padding: 4 },
-
-  weatherCard: { backgroundColor: MM_Colors.white, borderRadius: 24, padding: 20, marginBottom: 40, ...Shadows.soft },
-  weatherContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  weatherLoadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  loadingText: { ...Typography.caption, color: MM_Colors.primary },
-  cityText: { ...Typography.title, fontSize: 18 },
-  weatherStatus: { ...Typography.caption, marginTop: 2 },
-  tempRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 12 },
-  tempText: { ...Typography.header, fontSize: 44 },
-  tempUnit: { ...Typography.title, marginLeft: 2, color: MM_Colors.textVariant },
-
-  metricsCard: { backgroundColor: MM_Colors.white, borderRadius: 24, padding: 24, marginBottom: 20, ...Shadows.soft },
-  metricsTitle: { ...Typography.title, marginBottom: 20 },
-  metricRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 },
-  metricLabel: { ...Typography.body, fontSize: 15, color: MM_Colors.textVariant },
-  metricValue: { ...Typography.body, fontWeight: '700' },
-  progressBg: { height: 6, backgroundColor: MM_Colors.background, borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 3 },
-  metricsFooter: { flexDirection: 'row', marginTop: 24 },
-  primaryBtn: { flex: 1, height: 50, borderRadius: 25, backgroundColor: MM_Colors.primary, justifyContent: 'center', alignItems: 'center' },
-  primaryBtnText: { color: '#FFF', fontWeight: '700', letterSpacing: 0.5 },
-
-  fab: { position: 'absolute', bottom: 30, right: 20, width: 60, height: 60, borderRadius: 30, ...Shadows.soft },
-  fabInner: { width: '100%', height: '100%', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
-
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#FFF', borderRadius: 20, padding: 24, width: '100%', ...Shadows.soft },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { ...Typography.title },
-  label: { ...Typography.caption, fontWeight: '700', marginBottom: 12, marginTop: 12 },
-  input: { borderBottomWidth: 1, borderBottomColor: MM_Colors.surfaceContainer, paddingVertical: 8, ...Typography.body, marginBottom: 24 },
-  iconPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  iconBox: { width: 44, height: 44, borderRadius: 10, backgroundColor: MM_Colors.background, justifyContent: 'center', alignItems: 'center' },
-  iconBoxSelected: { backgroundColor: MM_Colors.primary },
-  saveBtn: { backgroundColor: MM_Colors.primary, padding: 16, borderRadius: 12, alignItems: 'center' },
-  saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
-});

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { StatusBar, View, Text, Animated, StyleSheet, Easing, Dimensions, Platform, AppState } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
 import UpdateModal from './src/components/UpdateModal';
+import { ThemeProvider } from './src/context/ThemeContext';
 import { checkForUpdates, VersionManifest } from './src/services/UpdateService';
 
 const { width, height } = Dimensions.get('window');
@@ -178,7 +179,7 @@ export default function App() {
 
           <View style={styles.footerDecoration}>
              <View style={styles.line} />
-             <Text style={styles.tagline}>METHODIC MUSE SYSTEM</Text>
+             <Text style={styles.tagline}>DAILY HUB SYSTEM</Text>
              <View style={styles.line} />
           </View>
         </Animated.View>
@@ -191,8 +192,9 @@ export default function App() {
 
   return (
     <>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <AppNavigator />
+      <ThemeProvider>
+        <AppNavigator />
+      </ThemeProvider>
       {updateManifest && (
         <UpdateModal
           manifest={updateManifest}
