@@ -1,804 +1,1028 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  StyleSheet, 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  ScrollView, 
-  Dimensions, 
-  Alert, 
-  Keyboard, 
-  Animated, 
-  Platform, 
-  Modal, 
+import {
+  StyleSheet,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+  Alert,
+  Animated,
+  Platform,
+  Modal,
   Pressable,
   ActivityIndicator,
-  KeyboardAvoidingView
+  KeyboardAvoidingView,
+  StatusBar,
+  SafeAreaView,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
-import { cacheDirectory, writeAsStringAsync } from 'expo-file-system/legacy';
+import { useIsFocused } from '@react-navigation/native';
+import { cacheDirectory, writeAsStringAsync, EncodingType } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Typography, Shadows, Spacing } from '../theme/Theme';
 import { useTheme } from '../context/ThemeContext';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 type Mood = '😀' | '😌' | '😐' | '😩' | '😡';
 const MOODS: Mood[] = ['😀', '😌', '😐', '😩', '😡'];
-const CATEGORIES = ['All', 'Personal', 'Work', 'Ideas', 'Travel', 'Dreams'];
+type ViewMode = 'list' | 'grid' | 'bento' | 'compact';
+
+const PALETTE = [
+  '#FF6B6B', '#FF8E53', '#FFE66D', '#4ECDC4', '#45B7D1',
+  '#A8E6CF', '#C9B1FF', '#FF9ECD', '#B5EAD7', '#FFDAC1',
+  '#E2B4BD', '#9EC1CF', '#F7AEF8', '#72DDF7', '#8EE3EF',
+];
+
+interface Category {
+  name: string;
+  color: string;
+  icon: string;
+}
+
+const DEFAULT_CATEGORIES: Category[] = [
+  { name: 'Personal', color: '#FF6B6B', icon: '🏠' },
+  { name: 'Work', color: '#4ECDC4', icon: '💼' },
+  { name: 'Ideas', color: '#FFE66D', icon: '💡' },
+  { name: 'Travel', color: '#A8E6CF', icon: '✈️' },
+  { name: 'Dreams', color: '#C9B1FF', icon: '🌙' },
+];
 
 interface Note {
   id: string;
   title: string;
   content: string;
   date: string;
+  dateRaw: number;
   mood?: Mood;
   category: string;
+  isPinned?: boolean;
 }
+
+const formatDate = (ts: number) =>
+  new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function NotesScreen() {
   const { colors, isDark } = useTheme();
-  
-  const styles = StyleSheet.create({
-    mainContainer: { flex: 1, backgroundColor: colors.background },
-    authContainer: { flex: 1, backgroundColor: colors.background },
-    authMain: { flex: 1, paddingHorizontal: 30, justifyContent: 'center' },
-    identitySection: { alignItems: 'center', marginBottom: 40 },
-    enhancedIconContainer: { marginBottom: 20 },
-    iconCircle: { width: 80, height: 80, borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
-    authHeading: { ...Typography.header, fontSize: 32, textAlign: 'center', color: colors.text },
-    authSubtext: { ...Typography.body, color: colors.textVariant, textAlign: 'center', marginTop: 8 },
-    pinDisplay: { flexDirection: 'row', gap: 15, justifyContent: 'center', marginVertical: 40, height: 20 },
-    pinDot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: colors.primary },
-    pinDotActive: { backgroundColor: colors.primary },
-    keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 15, justifyContent: 'center' },
-    keypadBtn: { width: 75, height: 75, borderRadius: 38, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
-    keypadText: { ...Typography.title, fontSize: 24, color: colors.text },
-    keypadBtnText: { ...Typography.title, fontSize: 24, color: colors.text },
+  const isFocused = useIsFocused();
 
-    container: { flex: 1, backgroundColor: colors.background },
-    appBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
-    logoText: { ...Typography.header, fontSize: 32, color: colors.text },
-    appBarSub: { ...Typography.caption, color: colors.textVariant, fontWeight: '700' },
-    headerIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
+  const cardBg = isDark ? '#1C1C1E' : '#FFFFFF';
+  const secondaryText = isDark ? '#A1A1AA' : '#666666';
+  const surfaceVariant = isDark ? '#2C2C2E' : '#F2F2F7';
+  const outlineColor = isDark ? '#3A3A3C' : '#E5E5EA';
+  const placeholderColor = isDark ? '#55555A' : '#A0A0B0';
 
-    summaryBar: { flexDirection: 'row', paddingHorizontal: 24, marginBottom: 20 },
-    summaryItem: { flex: 1 },
-    summaryLabel: { ...Typography.caption, color: colors.textVariant },
-    summaryVal: { ...Typography.title, color: colors.text },
-    summaryDivider: { width: 1, height: 30, backgroundColor: colors.surfaceContainer, marginHorizontal: 15 },
-
-    searchSection: { paddingHorizontal: 24, marginBottom: 20 },
-    searchBarContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 15, paddingHorizontal: 15, height: 50, ...Shadows.soft },
-    searchInput: { flex: 1, marginLeft: 10, ...Typography.body, color: colors.text },
-
-    filterBar: { paddingBottom: 10 },
-    filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.surface, marginRight: 10, borderWidth: 1, borderColor: colors.surfaceContainer },
-    filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    filterChipText: { ...Typography.caption, fontWeight: '700', color: colors.textVariant },
-
-    notesGrid: { paddingHorizontal: 24, paddingBottom: 120 },
-    noteCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, marginBottom: 16, ...Shadows.soft },
-    noteTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-    cardIndicatorMood: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
-    noteCardTitle: { ...Typography.title, fontSize: 18, color: colors.text },
-    noteDateText: { ...Typography.caption, color: colors.textVariant },
-    noteCardContent: { ...Typography.body, fontSize: 15, color: colors.textVariant, lineHeight: 22 },
-    noteBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: colors.background },
-    bottomTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.background },
-    tagBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.background },
-    tagText: { ...Typography.caption, fontSize: 10, color: colors.primary, fontWeight: '700' },
-
-    emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 },
-    emptyIconBg: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', marginBottom: 20, ...Shadows.soft },
-    emptyTextTitle: { ...Typography.title, color: colors.text },
-    emptyTextSub: { ...Typography.body, color: colors.textVariant, textAlign: 'center', paddingHorizontal: 40 },
-
-    fabMain: { position: 'absolute', bottom: 30, right: 30, width: 64, height: 64, borderRadius: 32, ...Shadows.soft },
-    fabInner: { width: '100%', height: '100%', borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
-
-    editorScreen: { flex: 1, backgroundColor: colors.background },
-    editorHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingTop: Platform.OS === 'ios' ? 60 : 20 },
-    headerTitleMain: { ...Typography.title, color: colors.text },
-    navText: { ...Typography.body, color: colors.textVariant, fontWeight: '600' },
-
-    editControls: { paddingHorizontal: 20, marginBottom: 20 },
-    selectorGroup: { marginBottom: 20 },
-    labelSmall: { ...Typography.caption, fontWeight: '800', color: colors.textVariant, marginBottom: 10 },
-    moodRow: { flexDirection: 'row', gap: 10 },
-    moodBadge: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
-    moodActive: { backgroundColor: colors.primary },
-    catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    catChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.surfaceContainer },
-    catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-    chipText: { ...Typography.caption, fontWeight: '700', color: colors.textVariant },
-    catChipText: { ...Typography.caption, fontWeight: '700', color: colors.textVariant },
-
-    titleInput: { ...Typography.header, fontSize: 28, paddingHorizontal: 20, marginBottom: 10, color: colors.text },
-    contentInput: { ...Typography.body, paddingHorizontal: 20, color: colors.text, fontSize: 17, minHeight: 400, textAlignVertical: 'top' },
-
-    viewContainer: { flex: 1, backgroundColor: colors.background },
-    viewContent: { padding: 20 },
-    viewMeta: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 20 },
-    viewDate: { ...Typography.caption, color: colors.textVariant },
-    viewTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-    viewTitle: { ...Typography.header, fontSize: 32, color: colors.text, flex: 1 },
-    viewMoodBig: { fontSize: 40 },
-    viewBody: { ...Typography.body, color: colors.text, fontSize: 17, lineHeight: 26 },
-    viewBodyWrapper: { marginTop: 10 },
-
-    actionGroup: { gap: 10, padding: 20 },
-    actionRow: { flexDirection: 'row', alignItems: 'center', padding: 15, backgroundColor: colors.surface, borderRadius: 15, ...Shadows.soft },
-    actionIconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
-    actionTextMain: { ...Typography.body, fontWeight: '700', color: colors.text },
-    actionTextSub: { ...Typography.caption, color: colors.textVariant },
-    deleteAction: { marginTop: 20 },
-
-    modalOverlayAction: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-    modalContentAction: { backgroundColor: colors.surface, borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20 },
-    actionIndicator: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.background, alignSelf: 'center', marginBottom: 20 },
-    actionHeader: { marginBottom: 20 },
-    closeActionBtn: { padding: 15, borderRadius: 15, backgroundColor: colors.background, alignItems: 'center', marginTop: 10 },
-    closeActionText: { ...Typography.body, fontWeight: '700', color: colors.textVariant },
-
-    modalOverlayCenter: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    confirmContent: { backgroundColor: colors.surface, padding: 30, borderRadius: 30, width: '100%', alignItems: 'center' },
-    confirmIconBg: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.error + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-    confirmTitle: { ...Typography.title, color: colors.text },
-    confirmSub: { ...Typography.body, color: colors.textVariant, textAlign: 'center', marginBottom: 30 },
-    confirmActions: { flexDirection: 'row', gap: 15, width: '100%' },
-    cancelConfirmBtn: { flex: 1, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: colors.background },
-    cancelConfirmText: { ...Typography.body, color: colors.textVariant, fontWeight: '700' },
-    deleteConfirmBtn: { flex: 1, paddingVertical: 15, borderRadius: 12, alignItems: 'center', backgroundColor: colors.error },
-    deleteConfirmText: { ...Typography.body, color: '#FFF', fontWeight: '800' },
-  });
-
+  // ── State ──────────────────────────────────────────────────────────────────
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasRegisteredPin, setHasRegisteredPin] = useState<boolean | null>(null);
   const [pin, setPin] = useState('');
-  
   const [setupStep, setSetupStep] = useState<'none' | 'set' | 'confirm'>('none');
   const [tempPin, setTempPin] = useState('');
 
   const [notes, setNotes] = useState<Note[]>([]);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
+
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [filterFrom, setFilterFrom] = useState<Date | null>(null);
+  const [filterTo, setFilterTo] = useState<Date | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const [isEditing, setIsEditing] = useState(false);
   const [isViewing, setIsViewing] = useState(false);
   const [currentNote, setCurrentNote] = useState<Partial<Note>>({});
-  
+
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
-  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
-  const [noteToDelete, setNoteToDelete] = useState<string | null>(null);
+  const [isCategoryMgrVisible, setIsCategoryMgrVisible] = useState(false);
 
   const [hint, setHint] = useState('');
   const [showHint, setShowHint] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const isFocused = useIsFocused();
-  const navigation = useNavigation<any>();
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatIcon, setNewCatIcon] = useState('📝');
+  const [newCatColor, setNewCatColor] = useState(PALETTE[0]);
 
-  // Animations
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const blinkAnim = useRef(new Animated.Value(1)).current;
 
+  // ── Boot ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     checkPinStatus();
     loadNotes();
-    Animated.timing(fadeAnim, { toValue: 1, duration: 800, useNativeDriver: true }).start();
-  }, []);
-
-  useEffect(() => {
-    if (!isFocused && isAuthenticated) {
-      // Auto-lock when leaving
-      setIsAuthenticated(false);
-      setPin('');
-      setIsEditing(false);
-      setIsViewing(false);
-    }
+    loadCategories();
   }, [isFocused]);
 
   const checkPinStatus = async () => {
-    try {
-      let savedPin = await AsyncStorage.getItem('@journal_pin_v3');
-      
-      // Auto-migrate from older version keys if v3 is not set
-      if (!savedPin) {
-        const legacyPin = await AsyncStorage.getItem('@journal_pin_v2') || await AsyncStorage.getItem('@journal_pin');
-        if (legacyPin && legacyPin.length === 6) {
-          await AsyncStorage.setItem('@journal_pin_v3', legacyPin);
-          savedPin = legacyPin;
-        }
-      }
+    const saved = await AsyncStorage.getItem('@journal_pin_v3');
+    setHasRegisteredPin(!!saved);
+    setIsAuthenticated(!saved);
+  };
 
-      setHasRegisteredPin(!!savedPin);
-      if (!savedPin) {
-         setIsAuthenticated(true);
-      }
-    } catch (e) {
-      console.warn('PIN check failed:', e);
-      setHasRegisteredPin(false); // Fail safe
-      setIsAuthenticated(true); 
+  const loadNotes = async () => {
+    const stored = await AsyncStorage.getItem('@daily_notes_v3');
+    if (stored) setNotes(JSON.parse(stored));
+  };
+
+  const loadCategories = async () => {
+    const stored = await AsyncStorage.getItem('@journal_categories_v1');
+    if (stored) setCategories(JSON.parse(stored));
+  };
+
+  const saveCategories = async (cats: Category[]) => {
+    setCategories(cats);
+    await AsyncStorage.setItem('@journal_categories_v1', JSON.stringify(cats));
+  };
+
+  // ── Category helpers ───────────────────────────────────────────────────────
+  const getCategoryColor = (name: string) =>
+    (categories.find(c => c.name === name) ?? { color: colors.primary }).color;
+  const getCategoryIcon = (name: string) =>
+    (categories.find(c => c.name === name) ?? { icon: '📝' }).icon;
+
+  // ── Filtering ──────────────────────────────────────────────────────────────
+  const filteredNotes = notes.filter(n => {
+    if (selectedCategory !== 'All' && n.category !== selectedCategory) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      if (!n.title.toLowerCase().includes(q) && !n.content.toLowerCase().includes(q)) return false;
     }
-  };
-
-  const startSetup = () => {
-    setIsAuthenticated(false);
-    setSetupStep('set');
-    setPin('');
-    setIsSettingsVisible(false);
-  };
-
-  const triggerHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Medium) => {
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(style);
+    if (filterFrom) {
+      const from = new Date(filterFrom); from.setHours(0, 0, 0, 0);
+      if (n.dateRaw < from.getTime()) return false;
     }
-  };
+    if (filterTo) {
+      const to = new Date(filterTo); to.setHours(23, 59, 59, 999);
+      if (n.dateRaw > to.getTime()) return false;
+    }
+    return true;
+  });
 
-  const shake = () => {
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true })
-    ]).start();
-  };
+  const pinnedNotes = filteredNotes.filter(n => n.isPinned);
+  const unpinnedNotes = filteredNotes.filter(n => !n.isPinned);
+  const displayNotes = [...pinnedNotes, ...unpinnedNotes];
 
+  // ── PIN ────────────────────────────────────────────────────────────────────
   const handlePinInput = async (digit: string) => {
     const newPin = pin + digit;
     if (newPin.length > 6) return;
     setPin(newPin);
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     if (newPin === '198921') {
-      try {
-        const savedPin = await AsyncStorage.getItem('@journal_pin_v3');
-        if (savedPin) {
-          setHint(savedPin.split('').reverse().join(''));
-          setShowHint(true);
-          triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-          setTimeout(() => {
-            setShowHint(false);
-            setHint('');
-          }, 600);
-        } else {
-          shake();
-        }
-      } catch (e) {
-        shake();
+      const saved = await AsyncStorage.getItem('@journal_pin_v3');
+      if (saved) {
+        setHint(saved.split('').reverse().join(''));
+        setShowHint(true);
+        blinkAnim.setValue(1);
+        Animated.sequence([
+          ...Array(5).fill(null).flatMap(() => [
+            Animated.timing(blinkAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+            Animated.timing(blinkAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+          ])
+        ]).start(() => setTimeout(() => setShowHint(false), 1500));
       }
-      setTimeout(() => setPin(''), 50);
-      return;
+      setPin(''); return;
     }
-    
+
     if (newPin.length === 6) {
-      setTimeout(async () => {
-        if (setupStep === 'set') {
-          setTempPin(newPin);
-          setSetupStep('confirm');
-          setPin('');
-        } else if (setupStep === 'confirm') {
-          if (newPin === tempPin) {
-             await AsyncStorage.setItem('@journal_pin_v3', newPin);
-             setHasRegisteredPin(true);
-             setIsAuthenticated(true);
-             setSetupStep('none');
-             triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-          } else {
-             shake();
-             Alert.alert("Retry Required", "PINs don't match. Please set your 6-digit PIN carefully.");
-             setSetupStep('set');
-          }
-          setPin('');
+      if (setupStep === 'set') {
+        setTempPin(newPin); setSetupStep('confirm'); setPin('');
+      } else if (setupStep === 'confirm') {
+        if (newPin === tempPin) {
+          await AsyncStorage.setItem('@journal_pin_v3', newPin);
+          setHasRegisteredPin(true); setIsAuthenticated(true); setSetupStep('none');
+          Alert.alert('Security Set', 'Your journal is now protected.');
         } else {
-          try {
-            const savedPin = await AsyncStorage.getItem('@journal_pin_v3');
-            if (newPin === savedPin) {
-              setIsAuthenticated(true);
-              triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-            } else {
-              shake();
-            }
-          } catch (e) {
-            shake();
-          }
-          setPin('');
+          setSetupStep('set'); setPin('');
+          Alert.alert('Mismatch', 'PINs did not match. Try again.');
         }
-      }, 100);
-    }
-  };
-
-  const removeLastDigit = () => {
-    setPin(pin.slice(0, -1));
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const loadNotes = async () => {
-    try {
-      const stored = await AsyncStorage.getItem('@daily_notes_v3');
-      if (stored) setNotes(JSON.parse(stored));
-    } catch (e) {}
-  };
-
-  const saveNotes = async (newNotes: Note[]) => {
-    setNotes(newNotes); 
-    try {
-      await AsyncStorage.setItem('@daily_notes_v3', JSON.stringify(newNotes));
-    } catch (e) {}
-  };
-
-  const exportNotes = async () => {
-    if (notes.length === 0) {
-      Alert.alert("Nothing to Export", "Your journal is empty. Add some entries first.");
-      return;
-    }
-
-    const header = `DAILY HUB JOURNAL EXPORT\nGenerated: ${new Date().toLocaleString()}\nTotal entries: ${notes.length}\n${'='.repeat(35)}\n\n`;
-    const content = notes.map(n => 
-      `DATE: ${n.date}\nTITLE: ${n.title}\nMOOD: ${n.mood || 'N/A'}\nCATEGORY: ${n.category}\n\n${n.content}\n\n${'-'.repeat(20)}\n\n`
-    ).join('');
-
-    const fullText = header + content;
-
-    try {
-      const fileName = `Journal_${new Date().toISOString().split('T')[0]}.txt`;
-      const filePath = `${cacheDirectory}${fileName}`;
-      await writeAsStringAsync(filePath, fullText);
-      
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(filePath, {
-          mimeType: 'text/plain',
-          dialogTitle: 'Export Journal',
-          UTI: 'public.plain-text'
-        });
       } else {
-        // Fallback to basic share
-        const { Share: RNShare } = require('react-native');
-        await RNShare.share({ message: fullText, title: 'Journal Export' });
+        const saved = await AsyncStorage.getItem('@journal_pin_v3');
+        if (newPin === saved) { setIsAuthenticated(true); setPin(''); }
+        else {
+          setPin('');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          Animated.sequence([
+            Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
+          ]).start();
+        }
       }
-      setIsSettingsVisible(false);
-    } catch (e) {
-      console.warn('Export error:', e);
-      Alert.alert("Export Failed", "Could not generate the export file. Check storage permissions.");
     }
   };
 
-  const saveCurrentNote = () => {
-    Keyboard.dismiss();
-    if (!currentNote.title?.trim() && !currentNote.content?.trim()) {
-      setIsEditing(false);
-      return;
-    }
+  // ── Note CRUD ──────────────────────────────────────────────────────────────
+  const saveCurrentNote = async () => {
+    if (!currentNote.title?.trim() && !currentNote.content?.trim()) { setIsEditing(false); return; }
+    const ts = Date.now();
     const newNote: Note = {
-      id: currentNote.id || Date.now().toString(),
-      title: currentNote.title || 'Untitled Entry',
+      id: currentNote.id || ts.toString(),
+      title: currentNote.title || 'Untitled',
       content: currentNote.content || '',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      date: formatDate(ts),
+      dateRaw: currentNote.dateRaw || ts,
       mood: currentNote.mood || '😌',
       category: currentNote.category || 'Personal',
+      isPinned: currentNote.isPinned || false,
     };
-    
-    let updatedNotes;
-    if (currentNote.id) {
-      updatedNotes = notes.map(n => n.id === currentNote.id ? newNote : n);
-    } else {
-      updatedNotes = [newNote, ...notes];
-    }
-    saveNotes(updatedNotes);
-    setIsEditing(false);
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    const updated = currentNote.id
+      ? notes.map(n => n.id === currentNote.id ? newNote : n)
+      : [newNote, ...notes];
+    setNotes(updated);
+    await AsyncStorage.setItem('@daily_notes_v3', JSON.stringify(updated));
+    setIsEditing(false); setIsViewing(false);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   };
 
-  const handleDeleteNote = () => {
-    if (noteToDelete) {
-      const updatedNotes = notes.filter(n => n.id !== noteToDelete);
-      saveNotes(updatedNotes);
-      setIsDeleteModalVisible(false);
-      setIsViewing(false);
-      setNoteToDelete(null);
-      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-    }
+  const deleteNote = async (id: string) => {
+    Alert.alert('Delete Entry', 'Remove this note permanently?', [
+      { text: 'Cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          const updated = notes.filter(n => n.id !== id);
+          setNotes(updated);
+          await AsyncStorage.setItem('@daily_notes_v3', JSON.stringify(updated));
+          setIsEditing(false); setIsViewing(false);
+        }
+      },
+    ]);
   };
 
-  const filteredNotes = notes.filter(note => {
-    const matchesCategory = selectedCategory === 'All' || note.category === selectedCategory;
-    const matchesSearch = note.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          note.content.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
+  const togglePin = async (id: string) => {
+    const updated = notes.map(n => n.id === id ? { ...n, isPinned: !n.isPinned } : n);
+    setNotes(updated);
+    await AsyncStorage.setItem('@daily_notes_v3', JSON.stringify(updated));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  // ── Export ─────────────────────────────────────────────────────────────────
+  const exportJournal = async () => {
+    if (notes.length === 0) { Alert.alert('Empty Journal', 'No entries to export.'); return; }
+    const exportContent = notes
+      .map(n => `DATE: ${n.date}\nTITLE: ${n.title}\nCATEGORY: ${n.category}\nMOOD: ${n.mood ?? ''}\n\n${n.content ?? ''}\n\n${'─'.repeat(40)}`)
+      .join('\n\n');
+    const filePath = `${cacheDirectory}Journal_Backup_${Date.now()}.txt`;
+    try {
+      await writeAsStringAsync(filePath, exportContent, { encoding: EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(filePath, { mimeType: 'text/plain', dialogTitle: 'Export Journal' });
+      }
+      setIsSettingsVisible(false);
+    } catch { Alert.alert('Export Error', 'Failed to generate file.'); }
+  };
+
+  const startPinSetup = () => {
+    setIsSettingsVisible(false); setSetupStep('set'); setIsAuthenticated(false); setPin('');
+  };
+
+  // ── Calendar helpers ───────────────────────────────────────────────────────
+  const calDays = () => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const first = new Date(year, month, 1).getDay();
+    const days = new Date(year, month + 1, 0).getDate();
+    return { first, days, year, month };
+  };
+
+  const hasNotesOnDay = (d: Date) =>
+    notes.some(n => {
+      const nd = new Date(n.dateRaw);
+      return nd.getFullYear() === d.getFullYear() && nd.getMonth() === d.getMonth() && nd.getDate() === d.getDate();
+    });
+
+  // ── Styles ─────────────────────────────────────────────────────────────────
+  const s = StyleSheet.create({
+    // layout
+    mainContainer: { flex: 1, backgroundColor: colors.background },
+    appBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+    logoText: { fontSize: 30, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
+    headerIcons: { flexDirection: 'row', gap: 8 },
+    headerIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: surfaceVariant, justifyContent: 'center', alignItems: 'center' },
+    // stats
+    statsRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 10, marginBottom: 16 },
+    statCard: { flex: 1, backgroundColor: surfaceVariant, borderRadius: 16, padding: 14 },
+    statLabel: { fontSize: 11, color: secondaryText, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+    statVal: { fontSize: 26, fontWeight: '800', color: colors.text, marginTop: 2 },
+    // search
+    searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 14, backgroundColor: surfaceVariant, borderRadius: 14, paddingHorizontal: 14, height: 44, gap: 8 },
+    searchInput: { flex: 1, fontSize: 15, color: colors.text },
+    // chips
+    filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: surfaceVariant, borderWidth: 1.5, borderColor: 'transparent', marginRight: 8, flexDirection: 'row', alignItems: 'center', gap: 5 },
+    filterChipText: { fontSize: 13, fontWeight: '700', color: secondaryText },
+    // date badge
+    dateBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: surfaceVariant, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, gap: 5 },
+    dateBadgeText: { fontSize: 12, fontWeight: '700', color: secondaryText },
+    // cards
+    noteCard: { backgroundColor: cardBg, borderRadius: 20, padding: 18, marginHorizontal: 20, marginBottom: 12, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: isDark ? 0 : 0.07, shadowRadius: 10 },
+    noteTitle: { fontSize: 17, fontWeight: '700', color: colors.text, flex: 1 },
+    noteSnippet: { fontSize: 14, color: secondaryText, lineHeight: 20, marginTop: 4 },
+    noteMeta: { fontSize: 11, fontWeight: '700', marginTop: 10, letterSpacing: 0.3 },
+    gridCard: { backgroundColor: cardBg, borderRadius: 20, padding: 16, margin: 6, flex: 1, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: isDark ? 0 : 0.07, shadowRadius: 10 },
+    compactCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: outlineColor, gap: 12 },
+    compactDot: { width: 10, height: 10, borderRadius: 5 },
+    bentoContainer: { paddingHorizontal: 20, gap: 10 },
+    bentoRow: { flexDirection: 'row', gap: 10 },
+    bentoCard: { backgroundColor: cardBg, borderRadius: 20, padding: 16, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: isDark ? 0 : 0.07, shadowRadius: 10 },
+    sectionLabel: { fontSize: 11, fontWeight: '800', color: secondaryText, textTransform: 'uppercase', letterSpacing: 1, marginHorizontal: 20, marginBottom: 8, marginTop: 4 },
+    // auth
+    authContainer: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 30 },
+    authInner: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    hintBadge: { position: 'absolute', top: 16, right: 16, backgroundColor: colors.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10, zIndex: 999 },
+    hintText: { color: '#FFF', fontWeight: '800', fontSize: 13 },
+    authHeading: { fontSize: 26, fontWeight: '800', textAlign: 'center', color: colors.text, marginBottom: 8 },
+    authSubtext: { fontSize: 15, color: secondaryText, textAlign: 'center', marginBottom: 20 },
+    pinDisplay: { flexDirection: 'row', gap: 14, justifyContent: 'center', marginVertical: 30 },
+    pinDot: { width: 15, height: 15, borderRadius: 8, borderWidth: 2, borderColor: colors.primary },
+    pinDotActive: { backgroundColor: colors.primary },
+    keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'center' },
+    keypadBtn: { width: 76, height: 76, borderRadius: 38, backgroundColor: surfaceVariant, justifyContent: 'center', alignItems: 'center' },
+    keypadText: { fontSize: 24, fontWeight: '600', color: colors.text },
+    // editor
+    editorHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, gap: 10 },
+    titleInput: { fontSize: 28, fontWeight: '800', paddingHorizontal: 20, color: colors.text, marginBottom: 8 },
+    contentInput: { fontSize: 17, paddingHorizontal: 20, color: colors.text, lineHeight: 26, minHeight: 280, textAlignVertical: 'top' },
+    bottomActions: { flexDirection: 'row', padding: 16, paddingBottom: Platform.OS === 'ios' ? 32 : 16, backgroundColor: cardBg, borderTopWidth: 1, borderTopColor: outlineColor, gap: 10 },
+    actionBtn: { flex: 1, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    cancelBtn: { backgroundColor: surfaceVariant },
+    saveBtn: { backgroundColor: colors.primary },
+    btnText: { fontSize: 15, fontWeight: '700' },
+    fabMain: { position: 'absolute', bottom: 28, right: 20, width: 60, height: 60, borderRadius: 18, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center', elevation: 10, shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 12 },
+    // modals
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    modalContent: { backgroundColor: cardBg, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: 36 },
+    modalTitle: { fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 18 },
+    actionRow: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: surfaceVariant, borderRadius: 14, marginBottom: 10 },
+    actionText: { fontSize: 15, fontWeight: '700', color: colors.text, marginLeft: 14 },
+    // category mgr
+    catRow: { flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: surfaceVariant, borderRadius: 14, marginBottom: 10 },
+    catColorDot: { width: 22, height: 22, borderRadius: 11, marginRight: 12 },
+    // calendar
+    calNavRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+    calMonthText: { fontSize: 16, fontWeight: '800', color: colors.text },
+    calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+    calCell: { width: (width - 80) / 7, height: 38, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
+    calDayHeader: { fontSize: 11, fontWeight: '700', color: secondaryText },
+    calDayText: { fontSize: 13, color: colors.text },
   });
 
-  const renderAuthScreen = () => (
-    <View style={styles.authContainer}>
-      <LinearGradient colors={['#F9F5FF', '#FDFDFF']} style={StyleSheet.absoluteFill} />
-      <View style={styles.authMain}>
-        <Animated.View style={[styles.identitySection, { transform: [{ translateX: shakeAnim }] }]}>
-          <View style={styles.enhancedIconContainer}>
-             <LinearGradient colors={[colors.primary + '20', colors.primary + '05']} style={styles.iconCircle}>
-                <MaterialCommunityIcons name="feather" size={44} color={colors.primary} />
-             </LinearGradient>
-          </View>
-          <Text style={styles.authHeading}>
-            {setupStep === 'none' ? 'Your Journal' : (setupStep === 'set' ? 'Set Your PIN' : 'Confirm PIN')}
-          </Text>
-          <Text style={styles.authSubtext}>
-            {setupStep === 'none' ? 'Secure entry to your private thoughts.' : 'Choose a 6-digit PIN for your journal.'}
-          </Text>
-        </Animated.View>
+  // ── Auth Screen ────────────────────────────────────────────────────────────
+  if (hasRegisteredPin === null) {
+    return (
+      <View style={[s.authContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
-        <View style={styles.pinDisplay}>
-          {[...Array(6)].map((_, i) => (
-            <View key={i} style={[styles.pinDot, pin.length > i && styles.pinDotActive]} />
-          ))}
-        </View>
-
+  if ((hasRegisteredPin && !isAuthenticated) || setupStep !== 'none') {
+    return (
+      <SafeAreaView style={s.authContainer}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         {showHint && (
-          <View style={{position: 'absolute', right: 20, top: height * 0.4}}>
-            <Text style={{fontSize: 14, color: colors.textVariant, opacity: 0.1, fontWeight: '800'}}>{hint}</Text>
-          </View>
+          <Animated.View style={[s.hintBadge, { opacity: blinkAnim }]}>
+            <Text style={s.hintText}>HINT: {hint}</Text>
+          </Animated.View>
         )}
+        <View style={s.authInner}>
+          <Animated.View style={{ transform: [{ translateX: shakeAnim }], alignItems: 'center', width: '100%' }}>
+            <Text style={s.authHeading}>
+              {setupStep === 'set' ? 'Set Security PIN' : setupStep === 'confirm' ? 'Confirm PIN' : 'Unlock Journal'}
+            </Text>
+            {setupStep !== 'none' && <Text style={s.authSubtext}>Create a 6-digit PIN to protect your notes.</Text>}
+          </Animated.View>
+          <View style={s.pinDisplay}>
+            {[...Array(6)].map((_, i) => (
+              <View key={i} style={[s.pinDot, pin.length > i && s.pinDotActive]} />
+            ))}
+          </View>
+          <View style={s.keypad}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => (
+              <TouchableOpacity key={d} style={s.keypadBtn} onPress={() => handlePinInput(d.toString())}>
+                <Text style={s.keypadText}>{d}</Text>
+              </TouchableOpacity>
+            ))}
+            {/* bottom row: invisible spacer | 0 | backspace */}
+            <View style={[s.keypadBtn, { backgroundColor: 'transparent', elevation: 0 }]} />
+            <TouchableOpacity style={s.keypadBtn} onPress={() => handlePinInput('0')}>
+              <Text style={s.keypadText}>0</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.keypadBtn} onPress={() => setPin(p => p.slice(0, -1))}>
+              <Ionicons name="backspace-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          {setupStep !== 'none' && (
+            <TouchableOpacity style={{ marginTop: 28 }} onPress={() => { setSetupStep('none'); setPin(''); checkPinStatus(); }}>
+              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-        <View style={styles.keypad}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, '.', 0].map((digit, index) => (
-             digit === '.' ? (
-               <View key="blank" style={{ width: 80 }} />
-             ) : (
-               <Pressable key={digit} style={({pressed}) => [styles.keypadBtn, pressed && {backgroundColor: '#F7F7FF'}]} onPress={() => handlePinInput(digit.toString())}>
-                 <Text style={styles.keypadBtnText}>{digit}</Text>
-               </Pressable>
-             )
+  // ── Card renderers ─────────────────────────────────────────────────────────
+  const openNote = (note: Note) => { setCurrentNote(note); setIsViewing(true); };
+
+  const renderListCard = (note: Note) => {
+    const color = getCategoryColor(note.category);
+    const icon = getCategoryIcon(note.category);
+    return (
+      <TouchableOpacity
+        key={note.id}
+        style={[s.noteCard, { borderLeftWidth: 4, borderLeftColor: color }]}
+        onPress={() => openNote(note)}
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); togglePin(note.id); }}
+        activeOpacity={0.75}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Text style={s.noteTitle} numberOfLines={1}>{note.isPinned ? '📌 ' : ''}{note.title}</Text>
+          <Text style={{ fontSize: 20, marginLeft: 8 }}>{note.mood}</Text>
+        </View>
+        <Text style={s.noteSnippet} numberOfLines={2}>{note.content}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}>
+          <View style={{ backgroundColor: color + '25', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 11 }}>{icon}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '800', color, letterSpacing: 0.3 }}>{note.category.toUpperCase()}</Text>
+          </View>
+          <Text style={{ fontSize: 11, color: secondaryText, fontWeight: '600' }}>{note.date}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderGridCard = (note: Note) => {
+    const color = getCategoryColor(note.category);
+    return (
+      <TouchableOpacity
+        key={note.id}
+        style={[s.gridCard, { borderTopWidth: 4, borderTopColor: color, minHeight: 150 }]}
+        onPress={() => openNote(note)}
+        onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); togglePin(note.id); }}
+        activeOpacity={0.75}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+          <Text style={{ fontSize: 11, fontWeight: '800', color, letterSpacing: 0.3 }}>{getCategoryIcon(note.category)} {note.category.toUpperCase()}</Text>
+          <Text style={{ fontSize: 14 }}>{note.mood}</Text>
+        </View>
+        <Text style={[s.noteTitle, { fontSize: 15 }]} numberOfLines={2}>{note.isPinned ? '📌 ' : ''}{note.title}</Text>
+        <Text style={[s.noteSnippet, { fontSize: 13, marginTop: 4 }]} numberOfLines={3}>{note.content}</Text>
+        <Text style={{ fontSize: 11, color: secondaryText, fontWeight: '600', marginTop: 8 }}>{note.date}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderCompactCard = (note: Note) => {
+    const color = getCategoryColor(note.category);
+    return (
+      <TouchableOpacity key={note.id} style={s.compactCard} onPress={() => openNote(note)} activeOpacity={0.7}>
+        <View style={[s.compactDot, { backgroundColor: color }]} />
+        <View style={{ flex: 1 }}>
+          <Text style={[s.noteTitle, { fontSize: 15 }]} numberOfLines={1}>{note.isPinned ? '📌 ' : ''}{note.title}</Text>
+          <Text style={[s.noteSnippet, { fontSize: 12, marginTop: 0 }]} numberOfLines={1}>{note.content}</Text>
+        </View>
+        <Text style={{ fontSize: 18 }}>{note.mood}</Text>
+        <Text style={{ fontSize: 11, color: secondaryText, fontWeight: '600' }}>{note.date}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderBento = (noteList: Note[]) => {
+    const rows: JSX.Element[] = [];
+    let i = 0;
+    while (i < noteList.length) {
+      const pattern = Math.floor(i / 2) % 3;
+      if (pattern === 0 && i + 1 < noteList.length) {
+        // wide + narrow
+        const [a, b] = [noteList[i], noteList[i + 1]];
+        const ca = getCategoryColor(a.category), cb = getCategoryColor(b.category);
+        rows.push(
+          <View key={i} style={s.bentoRow}>
+            <TouchableOpacity style={[s.bentoCard, { flex: 2, borderTopWidth: 4, borderTopColor: ca, minHeight: 160 }]} onPress={() => openNote(a)} activeOpacity={0.75}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: ca, marginBottom: 6 }}>{getCategoryIcon(a.category)} {a.category.toUpperCase()}</Text>
+              <Text style={s.noteTitle} numberOfLines={2}>{a.isPinned ? '📌 ' : ''}{a.title}</Text>
+              <Text style={s.noteSnippet} numberOfLines={3}>{a.content}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                <Text style={{ fontSize: 11, color: secondaryText, fontWeight: '600' }}>{a.date}</Text>
+                <Text>{a.mood}</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.bentoCard, { flex: 1, borderTopWidth: 4, borderTopColor: cb, minHeight: 160 }]} onPress={() => openNote(b)} activeOpacity={0.75}>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: cb, marginBottom: 6 }}>{getCategoryIcon(b.category)}</Text>
+              <Text style={[s.noteTitle, { fontSize: 14 }]} numberOfLines={3}>{b.isPinned ? '📌 ' : ''}{b.title}</Text>
+              <Text style={[s.noteSnippet, { fontSize: 12 }]} numberOfLines={3}>{b.content}</Text>
+              <Text style={{ fontSize: 10, color: secondaryText, marginTop: 6 }}>{b.date}</Text>
+            </TouchableOpacity>
+          </View>
+        );
+        i += 2;
+      } else if (pattern === 1 && i + 2 < noteList.length) {
+        // three equal
+        const trio = [noteList[i], noteList[i + 1], noteList[i + 2]];
+        rows.push(
+          <View key={i} style={s.bentoRow}>
+            {trio.map(n => {
+              const c = getCategoryColor(n.category);
+              return (
+                <TouchableOpacity key={n.id} style={[s.bentoCard, { flex: 1, borderTopWidth: 4, borderTopColor: c, minHeight: 120 }]} onPress={() => openNote(n)} activeOpacity={0.75}>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: c, marginBottom: 4 }}>{getCategoryIcon(n.category)}</Text>
+                  <Text style={[s.noteTitle, { fontSize: 13 }]} numberOfLines={2}>{n.title}</Text>
+                  <Text style={[s.noteSnippet, { fontSize: 11 }]} numberOfLines={2}>{n.content}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+        i += 3;
+      } else {
+        // full width accent row
+        const n = noteList[i];
+        const c = getCategoryColor(n.category);
+        rows.push(
+          <TouchableOpacity key={n.id} style={[s.bentoCard, { borderLeftWidth: 5, borderLeftColor: c, flexDirection: 'row', alignItems: 'center', gap: 14 }]} onPress={() => openNote(n)} activeOpacity={0.75}>
+            <Text style={{ fontSize: 28 }}>{n.mood}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.noteTitle} numberOfLines={1}>{n.isPinned ? '📌 ' : ''}{n.title}</Text>
+              <Text style={s.noteSnippet} numberOfLines={1}>{n.content}</Text>
+              <Text style={{ fontSize: 11, color: secondaryText, marginTop: 4 }}>{n.date}</Text>
+            </View>
+          </TouchableOpacity>
+        );
+        i++;
+      }
+    }
+    return <View style={s.bentoContainer}>{rows}</View>;
+  };
+
+  // ── Calendar render ────────────────────────────────────────────────────────
+  const renderCalendar = () => {
+    const { first, days, year, month } = calDays();
+    const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+    return (
+      <View>
+        <View style={s.calNavRow}>
+          <TouchableOpacity onPress={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))}>
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={s.calMonthText}>
+            {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </Text>
+          <TouchableOpacity onPress={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))}>
+            <Ionicons name="chevron-forward" size={22} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+        <View style={s.calGrid}>
+          {DAY_LABELS.map(d => (
+            <View key={d} style={s.calCell}><Text style={s.calDayHeader}>{d}</Text></View>
           ))}
-          <Pressable style={styles.keypadBtn} onPress={removeLastDigit}>
-            <Ionicons name="backspace-outline" size={28} color={colors.textVariant} />
-          </Pressable>
+          {Array(first).fill(null).map((_, i) => <View key={'b' + i} style={s.calCell} />)}
+          {Array.from({ length: days }, (_, idx) => {
+            const d = idx + 1;
+            const date = new Date(year, month, d);
+            const fromMs = filterFrom ? new Date(filterFrom).setHours(0, 0, 0, 0) : null;
+            const toMs = filterTo ? new Date(filterTo).setHours(23, 59, 59, 999) : null;
+            const dMs = date.getTime();
+            const inRange = fromMs !== null && toMs !== null && dMs >= fromMs && dMs <= toMs;
+            const isEndpoint = (filterFrom && date.toDateString() === filterFrom.toDateString()) ||
+              (filterTo && date.toDateString() === filterTo.toDateString());
+            const hasNote = hasNotesOnDay(date);
+            return (
+              <TouchableOpacity
+                key={d}
+                style={[s.calCell, inRange && { backgroundColor: colors.primary + '20' }, isEndpoint && { backgroundColor: colors.primary }]}
+                onPress={() => {
+                  if (!filterFrom || (filterFrom && filterTo)) { setFilterFrom(date); setFilterTo(null); }
+                  else { date < filterFrom ? setFilterFrom(date) : setFilterTo(date); }
+                }}
+              >
+                <Text style={[s.calDayText, isEndpoint && { color: '#FFF', fontWeight: '800' }]}>{d}</Text>
+                {hasNote && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: isEndpoint ? '#FFF' : colors.primary, marginTop: 1 }} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+          <TouchableOpacity style={[s.actionBtn, s.cancelBtn, { flex: 1 }]} onPress={() => { setFilterFrom(null); setFilterTo(null); setCalendarVisible(false); }}>
+            <Text style={[s.btnText, { color: colors.text }]}>Clear</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.actionBtn, s.saveBtn, { flex: 1 }]} onPress={() => setCalendarVisible(false)}>
+            <Text style={[s.btnText, { color: '#FFF' }]}>Apply</Text>
+          </TouchableOpacity>
         </View>
       </View>
+    );
+  };
+
+  // ── View toggle component ──────────────────────────────────────────────────
+  const ViewToggle = () => (
+    <View style={{ flexDirection: 'row', backgroundColor: surfaceVariant, borderRadius: 12, padding: 3, gap: 2 }}>
+      {([['list', 'list-outline'], ['grid', 'grid-outline'], ['bento', 'apps-outline'], ['compact', 'reorder-four-outline']] as [ViewMode, string][]).map(([mode, icon]) => (
+        <TouchableOpacity
+          key={mode}
+          style={[{ width: 32, height: 32, borderRadius: 9, justifyContent: 'center', alignItems: 'center' }, viewMode === mode && { backgroundColor: cardBg, elevation: 2 }]}
+          onPress={() => setViewMode(mode)}
+        >
+          <Ionicons name={icon as any} size={17} color={viewMode === mode ? colors.primary : secondaryText} />
+        </TouchableOpacity>
+      ))}
     </View>
   );
 
-  if (hasRegisteredPin === null) {
-      return (
-        <View style={[styles.mainContainer, { justifyContent: 'center', alignItems: 'center' }]}>
-           <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      );
-  }
+  // ── Category Manager modal ─────────────────────────────────────────────────
+  const CategoryManager = () => (
+    <Modal visible={isCategoryMgrVisible} transparent animationType="slide">
+      <View style={s.modalOverlay}>
+        <Pressable style={{ flex: 1 }} onPress={() => { setIsCategoryMgrVisible(false); setEditingCategory(null); setNewCatName(''); }} />
+        <SafeAreaView style={[s.modalContent, { maxHeight: '88%' }]}>
+          <Text style={s.modalTitle}>Manage Categories</Text>
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {categories.map(cat => (
+              <View key={cat.name} style={s.catRow}>
+                <View style={[s.catColorDot, { backgroundColor: cat.color }]} />
+                <Text style={{ fontSize: 16, marginRight: 8 }}>{cat.icon}</Text>
+                <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.text }}>{cat.name}</Text>
+                <TouchableOpacity onPress={() => { setEditingCategory(cat); setNewCatName(cat.name); setNewCatIcon(cat.icon); setNewCatColor(cat.color); }} style={{ padding: 8, marginRight: 2 }}>
+                  <Ionicons name="pencil-outline" size={18} color={secondaryText} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => Alert.alert('Delete Category', `Remove "${cat.name}"? Notes keep their category name.`, [
+                  { text: 'Cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => saveCategories(categories.filter(c => c.name !== cat.name)) },
+                ])} style={{ padding: 8 }}>
+                  <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            ))}
 
-  if (!isAuthenticated && hasRegisteredPin) {
-    return renderAuthScreen();
-  }
+            {/* Add / Edit form */}
+            <View style={{ marginTop: 4, backgroundColor: surfaceVariant, borderRadius: 16, padding: 16 }}>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: secondaryText, marginBottom: 12, letterSpacing: 0.5 }}>
+                {editingCategory ? 'EDIT CATEGORY' : 'ADD CATEGORY'}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                <TextInput
+                  style={{ flex: 1, backgroundColor: cardBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: colors.text, fontSize: 15, fontWeight: '600' }}
+                  placeholder="Category name"
+                  placeholderTextColor={placeholderColor}
+                  value={newCatName}
+                  onChangeText={setNewCatName}
+                  maxLength={20}
+                />
+                <TextInput
+                  style={{ width: 52, backgroundColor: cardBg, borderRadius: 10, textAlign: 'center', fontSize: 22, paddingVertical: 8 }}
+                  value={newCatIcon}
+                  onChangeText={t => setNewCatIcon(t.slice(-2))}
+                  maxLength={2}
+                />
+              </View>
+              {/* Colour picker */}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {PALETTE.map(col => (
+                  <TouchableOpacity key={col} onPress={() => setNewCatColor(col)}
+                    style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: col, borderWidth: newCatColor === col ? 3 : 0, borderColor: colors.text }} />
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {editingCategory && (
+                  <TouchableOpacity style={[s.actionBtn, s.cancelBtn, { flex: 0.6 }]} onPress={() => { setEditingCategory(null); setNewCatName(''); setNewCatIcon('📝'); setNewCatColor(PALETTE[0]); }}>
+                    <Text style={[s.btnText, { color: colors.text, fontSize: 13 }]}>Cancel</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[s.actionBtn, s.saveBtn]} onPress={() => {
+                  if (!newCatName.trim()) return;
+                  if (editingCategory) {
+                    saveCategories(categories.map(c => c.name === editingCategory.name ? { name: newCatName.trim(), icon: newCatIcon, color: newCatColor } : c));
+                    setEditingCategory(null);
+                  } else {
+                    if (categories.find(c => c.name.toLowerCase() === newCatName.trim().toLowerCase())) {
+                      Alert.alert('Already exists', 'A category with this name already exists.'); return;
+                    }
+                    saveCategories([...categories, { name: newCatName.trim(), icon: newCatIcon, color: newCatColor }]);
+                  }
+                  setNewCatName(''); setNewCatIcon('📝'); setNewCatColor(PALETTE[0]);
+                }}>
+                  <Text style={[s.btnText, { color: '#FFF' }]}>{editingCategory ? 'Save Changes' : 'Add Category'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </View>
+    </Modal>
+  );
 
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  const todayStr = formatDate(Date.now());
+  const todayCount = notes.filter(n => n.date === todayStr).length;
+  const hasDateFilter = !!(filterFrom || filterTo);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN RENDER
+  // ═══════════════════════════════════════════════════════════════════════════
   return (
-    <View style={styles.mainContainer}>
-      {/* Background Gradient */}
-      <LinearGradient 
-        colors={isDark ? [colors.background, '#1A1826'] : ['#FDFCFF', '#F9F5FF']} 
-        style={StyleSheet.absoluteFill} 
-      />
+    <SafeAreaView style={s.mainContainer}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* App Bar */}
-      <View style={styles.appBar}>
-        <View>
-          <Text style={styles.logoText}>Journal</Text>
-          <Text style={styles.appBarSub}>DAILY HUB</Text>
+      <View style={s.appBar}>
+        <Text style={s.logoText}>Journal</Text>
+        <View style={s.headerIcons}>
+          <TouchableOpacity style={s.headerIcon} onPress={() => { setIsSearching(v => !v); setSearchQuery(''); }}>
+            <Ionicons name={isSearching ? 'close' : 'search-outline'} size={20} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={s.headerIcon} onPress={() => setIsSettingsVisible(true)}>
+            <Ionicons name="settings-outline" size={20} color={colors.text} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.headerIcon} onPress={() => setIsSettingsVisible(true)}>
-          <Ionicons name="settings-outline" size={24} color={colors.text} />
-        </TouchableOpacity>
       </View>
 
-      {/* Header Info */}
-      <View style={styles.summaryBar}>
-         <View style={styles.summaryItem}>
-            <Text style={styles.summaryVal}>{notes.length}</Text>
-            <Text style={styles.summaryLabel}>Entries</Text>
-         </View>
-         <View style={styles.summaryDivider} />
-         <View style={styles.summaryItem}>
-            <Text style={styles.summaryVal}>
-              {notes.length > 0 ? (notes.filter(n => n.date === new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })).length) : 0}
-            </Text>
-            <Text style={styles.summaryLabel}>Today</Text>
-         </View>
-      </View>
+      {/* Search bar */}
+      {isSearching && (
+        <View style={s.searchBar}>
+          <Ionicons name="search-outline" size={18} color={secondaryText} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search notes…"
+            placeholderTextColor={placeholderColor}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={secondaryText} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
-      <ScrollView stickyHeaderIndices={[1]} showsVerticalScrollIndicator={false}>
-        {/* Search */}
-        <View style={styles.searchSection}>
-          <View style={styles.searchBarContainer}>
-            <Ionicons name="search" size={20} color={colors.textVariant} />
-            <TextInput 
-              placeholder="Search your thoughts..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={styles.searchInput}
-              placeholderTextColor="#A0A0B0"
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={18} color={colors.textVariant} />
-              </TouchableOpacity>
-            )}
+      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {/* Stats */}
+        <View style={s.statsRow}>
+          <View style={s.statCard}>
+            <Text style={s.statLabel}>Total</Text>
+            <Text style={s.statVal}>{notes.length}</Text>
+          </View>
+          <View style={s.statCard}>
+            <Text style={s.statLabel}>Today</Text>
+            <Text style={s.statVal}>{todayCount}</Text>
+          </View>
+          <View style={[s.statCard, { backgroundColor: colors.primary + '20' }]}>
+            <Text style={[s.statLabel, { color: colors.primary }]}>Pinned</Text>
+            <Text style={[s.statVal, { color: colors.primary }]}>{notes.filter(n => n.isPinned).length}</Text>
           </View>
         </View>
 
-        {/* Categories (Sticky-ish) */}
-        <View style={{backgroundColor: 'transparent', paddingVertical: 8}}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={{ paddingHorizontal: 24, gap: 10 }}
-            style={styles.filterBar}
+        {/* Category filter chips */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 12, gap: 8, marginBottom: 12 }}>
+          <TouchableOpacity
+            style={[s.filterChip, selectedCategory === 'All' && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
+            onPress={() => setSelectedCategory('All')}
           >
-            {CATEGORIES.map(cat => (
-              <TouchableOpacity
-                key={cat}
-                onPress={() => { setSelectedCategory(cat); triggerHaptic(Haptics.ImpactFeedbackStyle.Light); }}
-                style={[styles.filterChip, selectedCategory === cat && styles.filterChipActive]}
-              >
-                <Text style={[styles.filterChipText, selectedCategory === cat && { color: '#FFF' }]}>{cat}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Empty State */}
-        {filteredNotes.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconBg}>
-               <MaterialCommunityIcons name="feather" size={40} color={colors.primary} />
-            </View>
-            <Text style={styles.emptyTextTitle}>No Entries Found</Text>
-            <Text style={styles.emptyTextSub}>
-              {searchQuery ? "Try a different search term or category." : "Start capturing your ideas and feelings today."}
-            </Text>
-          </View>
-        )}
-
-        {/* Notes Grid */}
-        <View style={styles.notesGrid}>
-          {filteredNotes.map((note) => (
-            <TouchableOpacity 
-              key={note.id} 
-              style={styles.noteCard}
-              activeOpacity={0.8}
-              onPress={() => {
-                setCurrentNote(note);
-                setIsViewing(true);
-                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-              }}
+            <Text style={[s.filterChipText, selectedCategory === 'All' && { color: colors.primary }]}>All</Text>
+          </TouchableOpacity>
+          {categories.map(cat => (
+            <TouchableOpacity
+              key={cat.name}
+              style={[s.filterChip, selectedCategory === cat.name && { borderColor: cat.color, backgroundColor: cat.color + '20' }]}
+              onPress={() => setSelectedCategory(cat.name)}
             >
-              <View style={styles.noteTop}>
-                 <View style={styles.cardIndicatorMood}>
-                    <Text style={{fontSize: 24}}>{note.mood || '😌'}</Text>
-                 </View>
-                 <View style={{flex: 1, paddingLeft: 16}}>
-                    <Text style={styles.noteCardTitle} numberOfLines={1}>{note.title}</Text>
-                    <Text style={styles.noteDateText}>{note.date}</Text>
-                 </View>
-              </View>
-              <Text style={styles.noteCardContent} numberOfLines={2}>{note.content}</Text>
-              <View style={styles.noteBottom}>
-                 <View style={styles.bottomTag}>
-                    <Text style={styles.tagText}>{note.category}</Text>
-                 </View>
-                 <Ionicons name="chevron-forward-outline" size={16} color={colors.textVariant} />
-              </View>
+              <Text style={{ fontSize: 13 }}>{cat.icon}</Text>
+              <Text style={[s.filterChipText, selectedCategory === cat.name && { color: cat.color }]}>{cat.name}</Text>
             </TouchableOpacity>
           ))}
-          <View style={{ height: 100 }} />
+          <TouchableOpacity
+            style={[s.filterChip, { borderStyle: 'dashed', borderColor: outlineColor }]}
+            onPress={() => setIsCategoryMgrVisible(true)}
+          >
+            <Ionicons name="add" size={13} color={secondaryText} />
+            <Text style={s.filterChipText}>Manage</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Date filter + View toggle row */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 }}>
+          <TouchableOpacity
+            style={[s.dateBadge, hasDateFilter && { backgroundColor: colors.primary + '20' }]}
+            onPress={() => setCalendarVisible(true)}
+          >
+            <Ionicons name="calendar-outline" size={14} color={hasDateFilter ? colors.primary : secondaryText} />
+            <Text style={[s.dateBadgeText, hasDateFilter && { color: colors.primary }]}>
+              {hasDateFilter
+                ? `${filterFrom ? filterFrom.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '…'} → ${filterTo ? filterTo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '…'}`
+                : 'Date Filter'}
+            </Text>
+            {hasDateFilter && (
+              <TouchableOpacity onPress={() => { setFilterFrom(null); setFilterTo(null); }}>
+                <Ionicons name="close-circle" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            )}
+          </TouchableOpacity>
+          <ViewToggle />
         </View>
+
+        {/* Notes */}
+        {displayNotes.length === 0 ? (
+          <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 40 }}>
+            <Text style={{ fontSize: 48 }}>📝</Text>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, marginTop: 16 }}>
+              {searchQuery || hasDateFilter || selectedCategory !== 'All' ? 'No matches' : 'Start writing'}
+            </Text>
+            <Text style={{ fontSize: 14, color: secondaryText, textAlign: 'center', marginTop: 8 }}>
+              {searchQuery || hasDateFilter || selectedCategory !== 'All'
+                ? 'Try adjusting your filters.'
+                : 'Tap the + button to create your first entry.'}
+            </Text>
+          </View>
+        ) : (
+          <>
+            {pinnedNotes.length > 0 && viewMode !== 'compact' && (
+              <Text style={s.sectionLabel}>📌 Pinned</Text>
+            )}
+            {viewMode === 'list' && displayNotes.map(renderListCard)}
+            {viewMode === 'grid' && (
+              <View style={{ paddingHorizontal: 14 }}>
+                {Array.from({ length: Math.ceil(displayNotes.length / 2) }, (_, i) => (
+                  <View key={i} style={{ flexDirection: 'row' }}>
+                    {renderGridCard(displayNotes[i * 2])}
+                    {displayNotes[i * 2 + 1] ? renderGridCard(displayNotes[i * 2 + 1]) : <View style={{ flex: 1, margin: 6 }} />}
+                  </View>
+                ))}
+              </View>
+            )}
+            {viewMode === 'bento' && renderBento(displayNotes)}
+            {viewMode === 'compact' && (
+              <View style={{ backgroundColor: cardBg, marginHorizontal: 20, borderRadius: 20, overflow: 'hidden', elevation: 2 }}>
+                {displayNotes.map(renderCompactCard)}
+              </View>
+            )}
+          </>
+        )}
+
+        <View style={{ height: 110 }} />
       </ScrollView>
 
       {/* FAB */}
-      <TouchableOpacity 
-        style={styles.fabMain}
-        onPress={() => {
-          setCurrentNote({ category: 'Personal', mood: '😌' });
-          setIsEditing(true);
-          triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-        }}
+      <TouchableOpacity
+        style={s.fabMain}
+        onPress={() => { setCurrentNote({ category: categories[0]?.name || 'Personal', mood: '😌' }); setIsEditing(true); }}
       >
-        <LinearGradient 
-          colors={[colors.primary, colors.primaryLight]} 
-          style={styles.fabInner}
-        >
-          <Ionicons name="add" size={32} color="#FFF" />
-        </LinearGradient>
+        <Ionicons name="add" size={30} color="#FFF" />
       </TouchableOpacity>
 
-      {/* View/Edit Note Modal */}
-      <Modal 
-        visible={isEditing || isViewing} 
-        animationType="slide" 
-        transparent={false}
-        statusBarTranslucent
-      >
-        <View style={{flex: 1, backgroundColor: colors.background}}>
-           <View style={styles.editorHeader}>
-              <TouchableOpacity onPress={() => { setIsEditing(false); setIsViewing(false); }}>
-                 <Text style={styles.navText}>Cancel</Text>
+      {/* ═══ Editor Modal ═══ */}
+      <Modal visible={isEditing || isViewing} animationType="slide">
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={s.editorHeader}>
+            <TouchableOpacity onPress={() => { setIsEditing(false); setIsViewing(false); }} style={{ padding: 4 }}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={{ flex: 1, fontSize: 12, color: colors.primary, fontWeight: '800', letterSpacing: 1, marginLeft: 4 }}>
+              {isViewing ? 'READING' : currentNote.id ? 'EDIT ENTRY' : 'NEW ENTRY'}
+            </Text>
+            {isViewing && currentNote.id && (
+              <TouchableOpacity onPress={() => togglePin(currentNote.id!)} style={{ padding: 6, marginRight: 2 }}>
+                <Ionicons name={currentNote.isPinned ? 'bookmark' : 'bookmark-outline'} size={22} color={colors.primary} />
               </TouchableOpacity>
-              <Text style={styles.headerTitleMain}>
-                {isEditing ? (currentNote.id ? 'Edit Entry' : 'New Entry') : 'Reading'}
-              </Text>
-              <TouchableOpacity onPress={isViewing ? () => setIsEditing(true) : saveCurrentNote}>
-                 <Text style={[styles.navText, { color: colors.primary, fontWeight: '800' }]}>
-                   {isViewing ? 'Edit' : 'Save'}
-                 </Text>
+            )}
+            {isViewing && currentNote.id && (
+              <TouchableOpacity onPress={() => deleteNote(currentNote.id!)} style={{ padding: 6 }}>
+                <Ionicons name="trash-outline" size={22} color="#FF3B30" />
               </TouchableOpacity>
-           </View>
+            )}
+          </View>
 
-           <KeyboardAvoidingView 
-              style={{flex: 1}} 
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-           >
-             <ScrollView style={{flex: 1}} contentContainerStyle={{paddingBottom: 40}}>
-                {isEditing ? (
-                  <>
-                    <View style={styles.editControls}>
-                      <View style={styles.selectorGroup}>
-                         <Text style={styles.labelSmall}>MOOD</Text>
-                         <View style={{flexDirection: 'row', gap: 12}}>
-                            {MOODS.map(m => (
-                              <TouchableOpacity 
-                                key={m} 
-                                onPress={() => { setCurrentNote({...currentNote, mood: m}); triggerHaptic(Haptics.ImpactFeedbackStyle.Light); }}
-                                style={[styles.moodBadge, currentNote.mood === m && styles.moodActive]}
-                              >
-                                <Text style={{fontSize: 24, opacity: currentNote.mood === m ? 1 : 0.4}}>{m}</Text>
-                              </TouchableOpacity>
-                            ))}
-                         </View>
-                      </View>
-
-                      <View style={styles.selectorGroup}>
-                         <Text style={styles.labelSmall}>CATEGORY</Text>
-                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap: 8}}>
-                            {CATEGORIES.slice(1).map(c => (
-                              <TouchableOpacity 
-                                key={c} 
-                                onPress={() => { setCurrentNote({...currentNote, category: c}); triggerHaptic(Haptics.ImpactFeedbackStyle.Light); }}
-                                style={[styles.catChip, currentNote.category === c && styles.catChipActive]}
-                              >
-                                <Text style={[styles.catChipText, currentNote.category === c && {color: '#FFF'}]}>{c}</Text>
-                              </TouchableOpacity>
-                            ))}
-                         </ScrollView>
-                      </View>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {isEditing ? (
+                <>
+                  {/* Mood picker */}
+                  <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 10, marginBottom: 16 }}>
+                    {MOODS.map(m => (
+                      <TouchableOpacity
+                        key={m}
+                        onPress={() => setCurrentNote({ ...currentNote, mood: m })}
+                        style={[{ width: 46, height: 46, borderRadius: 23, backgroundColor: surfaceVariant, justifyContent: 'center', alignItems: 'center' },
+                        currentNote.mood === m && { backgroundColor: colors.primary + '30', borderWidth: 2, borderColor: colors.primary }]}
+                      >
+                        <Text style={{ fontSize: 22 }}>{m}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  {/* Category picker */}
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
+                    {categories.map(c => (
+                      <TouchableOpacity
+                        key={c.name}
+                        style={[s.filterChip, currentNote.category === c.name && { borderColor: c.color, backgroundColor: c.color + '25' }]}
+                        onPress={() => setCurrentNote({ ...currentNote, category: c.name })}
+                      >
+                        <Text style={{ fontSize: 13 }}>{c.icon}</Text>
+                        <Text style={[s.filterChipText, currentNote.category === c.name && { color: c.color }]}>{c.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                  {/* Color accent bar */}
+                  <View style={{ height: 3, backgroundColor: getCategoryColor(currentNote.category || 'Personal'), marginHorizontal: 20, borderRadius: 2, marginBottom: 16 }} />
+                  <TextInput
+                    style={s.titleInput}
+                    placeholder="Title"
+                    placeholderTextColor={placeholderColor}
+                    value={currentNote.title}
+                    onChangeText={t => setCurrentNote({ ...currentNote, title: t })}
+                  />
+                  <TextInput
+                    style={s.contentInput}
+                    placeholder="Write something meaningful…"
+                    placeholderTextColor={placeholderColor}
+                    multiline
+                    value={currentNote.content}
+                    onChangeText={c => setCurrentNote({ ...currentNote, content: c })}
+                  />
+                </>
+              ) : (
+                <View style={{ padding: 24 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, gap: 12 }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 16, backgroundColor: getCategoryColor(currentNote.category || '') + '25', justifyContent: 'center', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 24 }}>{getCategoryIcon(currentNote.category || '')}</Text>
                     </View>
-
-                    <TextInput
-                      style={styles.titleInput}
-                      placeholder="Enter Title"
-                      value={currentNote.title}
-                      onChangeText={t => setCurrentNote({...currentNote, title: t})}
-                      placeholderTextColor="#D0D0E0"
-                    />
-                    <TextInput
-                      style={styles.contentInput}
-                      placeholder="Write your heart out..."
-                      multiline
-                      value={currentNote.content}
-                      onChangeText={c => setCurrentNote({...currentNote, content: c})}
-                      placeholderTextColor="#A0A0B0"
-                    />
-                  </>
-                ) : (
-                  <View style={styles.viewContent}>
-                     <View style={styles.viewMeta}>
-                        <View style={[styles.tagBadge, {backgroundColor: colors.primary + '15'}]}>
-                           <Text style={[styles.tagText, {color: colors.primary}]}>{currentNote.category}</Text>
-                        </View>
-                        <Text style={styles.viewDate}>{currentNote.date}</Text>
-                     </View>
-                     <View style={styles.viewTitleRow}>
-                        <Text style={styles.viewTitle}>{currentNote.title}</Text>
-                        <Text style={styles.viewMoodBig}>{currentNote.mood}</Text>
-                     </View>
-                     <View style={styles.viewBodyWrapper}>
-                        <Text style={styles.viewBody}>{currentNote.content}</Text>
-                     </View>
-
-                     <TouchableOpacity 
-                        style={[styles.actionRow, {marginTop: 40, borderBottomWidth: 0}]}
-                        onPress={() => { setNoteToDelete(currentNote.id!); setIsDeleteModalVisible(true); }}
-                     >
-                       <View style={[styles.actionIconBg, {backgroundColor: colors.error + '15'}]}>
-                           <Ionicons name="trash-outline" size={20} color={colors.error} />
-                        </View>
-                        <Text style={[styles.actionTextMain, {color: colors.error}]}>Delete Entry</Text>
-                     </TouchableOpacity>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: getCategoryColor(currentNote.category || ''), letterSpacing: 0.5 }}>
+                        {currentNote.category?.toUpperCase()}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: secondaryText }}>{currentNote.date}</Text>
+                    </View>
+                    <Text style={{ fontSize: 36 }}>{currentNote.mood}</Text>
                   </View>
-                )}
-             </ScrollView>
-           </KeyboardAvoidingView>
+                  <View style={{ height: 3, backgroundColor: getCategoryColor(currentNote.category || ''), borderRadius: 2, marginBottom: 20 }} />
+                  <Text style={{ fontSize: 30, fontWeight: '800', color: colors.text, lineHeight: 38 }}>{currentNote.title}</Text>
+                  <Text style={{ fontSize: 17, color: colors.text, marginTop: 18, lineHeight: 28 }}>{currentNote.content}</Text>
+                </View>
+              )}
+            </ScrollView>
+          </KeyboardAvoidingView>
+
+          <View style={s.bottomActions}>
+            <TouchableOpacity style={[s.actionBtn, s.cancelBtn]} onPress={() => { setIsEditing(false); setIsViewing(false); }}>
+              <Text style={[s.btnText, { color: colors.text }]}>Close</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.actionBtn, s.saveBtn]} onPress={isViewing ? () => { setIsViewing(false); setIsEditing(true); } : saveCurrentNote}>
+              <Text style={[s.btnText, { color: '#FFF' }]}>{isViewing ? 'Edit Entry' : 'Save Entry'}</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ═══ Calendar Modal ═══ */}
+      <Modal visible={calendarVisible} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <Pressable style={{ flex: 1 }} onPress={() => setCalendarVisible(false)} />
+          <SafeAreaView style={[s.modalContent, { paddingBottom: 30 }]}>
+            <Text style={s.modalTitle}>Filter by Date Range</Text>
+            {renderCalendar()}
+          </SafeAreaView>
         </View>
       </Modal>
 
-      {/* Settings Action Bottom Sheet */}
+      {/* ═══ Settings Modal ═══ */}
       <Modal visible={isSettingsVisible} transparent animationType="fade">
-        <View style={styles.modalOverlayAction}>
-          <Pressable style={{flex: 1}} onPress={() => setIsSettingsVisible(false)} />
-          <View style={styles.modalContentAction}>
-             <View style={styles.actionIndicator} />
-             <Text style={styles.actionHeader}>Journal Options</Text>
-             
-             <View style={styles.actionGroup}>
-               <Pressable style={styles.actionRow} onPress={exportNotes}>
-                  <View style={[styles.actionIconBg, {backgroundColor: colors.primary + '15'}]}>
-                    <Ionicons name="cloud-download-outline" size={20} color={colors.primary} />
-                  </View>
-                  <View style={{flex: 1, paddingLeft: 12}}>
-                    <Text style={styles.actionTextMain}>Export Entries</Text>
-                    <Text style={styles.actionTextSub}>Save all entries as a .txt file</Text>
-                  </View>
-               </Pressable>
-
-               <Pressable style={styles.actionRow} onPress={startSetup}>
-                  <View style={[styles.actionIconBg, {backgroundColor: colors.surfaceContainer}]}>
-                    <Ionicons name="key-outline" size={20} color={colors.text} />
-                  </View>
-                  <View style={{flex: 1, paddingLeft: 12}}>
-                    <Text style={styles.actionTextMain}>Privacy Settings</Text>
-                    <Text style={styles.actionTextSub}>Change your 6-digit PIN</Text>
-                  </View>
-               </Pressable>
-
-               <Pressable style={[styles.actionRow, { borderBottomWidth: 0 }]} onPress={() => {
-                  setIsSettingsVisible(false);
-                  Alert.alert("Wipe Journal", "This is permanent. Are you sure?", [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Delete Everything", style: "destructive", onPress: async () => {
-                        await AsyncStorage.removeItem('@daily_notes_v3');
-                        setNotes([]);
-                        triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-                    }}
-                  ]);
-               }}>
-                  <View style={[styles.actionIconBg, {backgroundColor: '#FFF2F5'}]}>
-                    <Ionicons name="trash-outline" size={20} color={colors.error} />
-                  </View>
-                  <View style={{flex: 1, paddingLeft: 12}}>
-                    <Text style={[styles.actionTextMain, {color: colors.error}]}>Wipe Data</Text>
-                    <Text style={styles.actionTextSub}>Permanently delete all notes</Text>
-                  </View>
-               </Pressable>
-             </View>
-             
-             <TouchableOpacity style={styles.closeActionBtn} onPress={() => setIsSettingsVisible(false)}>
-                <Text style={styles.closeActionText}>Close</Text>
-             </TouchableOpacity>
-          </View>
+        <View style={s.modalOverlay}>
+          <Pressable style={{ flex: 1 }} onPress={() => setIsSettingsVisible(false)} />
+          <SafeAreaView style={s.modalContent}>
+            <Text style={s.modalTitle}>Settings</Text>
+            <TouchableOpacity style={s.actionRow} onPress={exportJournal}>
+              <Ionicons name="cloud-download-outline" size={22} color={colors.primary} />
+              <Text style={s.actionText}>Export Journal (.txt)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.actionRow} onPress={() => { setIsSettingsVisible(false); setIsCategoryMgrVisible(true); }}>
+              <Ionicons name="color-palette-outline" size={22} color={colors.text} />
+              <Text style={s.actionText}>Manage Categories</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.actionRow} onPress={startPinSetup}>
+              <Ionicons name="lock-closed-outline" size={22} color={colors.text} />
+              <Text style={s.actionText}>Reset Security PIN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.actionRow, { backgroundColor: '#FF3B3012', marginBottom: 0 }]} onPress={() => {
+              Alert.alert('Delete All', 'Clear all entries permanently?', [
+                { text: 'Cancel' },
+                { text: 'Wipe', style: 'destructive', onPress: async () => { setNotes([]); await AsyncStorage.removeItem('@daily_notes_v3'); setIsSettingsVisible(false); } },
+              ]);
+            }}>
+              <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+              <Text style={[s.actionText, { color: '#FF3B30' }]}>Wipe All Data</Text>
+            </TouchableOpacity>
+          </SafeAreaView>
         </View>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal visible={isDeleteModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlayCenter}>
-          <View style={styles.confirmContent}>
-            <View style={styles.confirmIconBg}>
-               <Ionicons name="trash-bin-outline" size={28} color={colors.error} />
-            </View>
-            <Text style={styles.confirmTitle}>Delete this entry?</Text>
-            <Text style={styles.confirmSub}>You cannot undo this action.</Text>
-            <View style={styles.confirmActions}>
-              <TouchableOpacity style={styles.cancelConfirmBtn} onPress={() => { setIsDeleteModalVisible(false); setNoteToDelete(null); }}>
-                <Text style={styles.cancelConfirmText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteConfirmBtn} onPress={handleDeleteNote}>
-                <Text style={styles.deleteConfirmText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </View>
+      {/* ═══ Category Manager ═══ */}
+      <CategoryManager />
+    </SafeAreaView>
   );
 }

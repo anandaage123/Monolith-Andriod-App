@@ -91,7 +91,7 @@ const MODES = [
   },
 ];
 
-// Zen duration presets (key ask from user)
+// Zen duration presets
 const ZEN_DURATIONS = [2, 5, 10, 15, 20, 30, 45, 60];
 
 const TAGS = ['Work', 'Code', 'Study', 'Personal', 'Health', 'Zen'];
@@ -760,9 +760,6 @@ export default function FocusScreen() {
 
   const percent = (timeLeft / totalTime) * 100;
 
-  // ─── Sprint progress bar (for header in timer view) ───────────────────────
-  const sprintProgress = totalSprints > 0 ? (completedSprints / totalSprints) * 100 : 0;
-
   // ─── Styles ─────────────────────────────────────────────────────────────────
   const s = StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
@@ -770,7 +767,7 @@ export default function FocusScreen() {
     // Setup
     header: {
       paddingHorizontal: ds(24),
-      paddingTop: Platform.OS === 'ios' ? ds(56) : ds(28),
+      paddingTop: Platform.OS === 'ios' ? ds(70) : ds(50), // Increased to clear notch securely
       marginBottom: ds(12),
     },
     title: {
@@ -810,7 +807,7 @@ export default function FocusScreen() {
       fontWeight: '500',
     },
 
-    // Mode grid — strict 2 per row
+    // Mode grid
     grid: {
       flexDirection: 'column',
       gap: ds(10),
@@ -835,7 +832,7 @@ export default function FocusScreen() {
     gridItemText: { fontSize: ds(13), fontWeight: '700', color: colors.text, marginLeft: ds(8) },
     gridItemDesc: { fontSize: ds(10), color: colors.textVariant, opacity: 0.7 },
 
-    // Zen duration chips — wrap, no horizontal scroll
+    // Zen duration chips
     zenDurationRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -891,7 +888,7 @@ export default function FocusScreen() {
     },
     sprintChipTextActive: { color: '#fff' },
 
-    // Tags — wrap
+    // Tags
     tagRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -969,7 +966,7 @@ export default function FocusScreen() {
     timerRoot: { flex: 1, justifyContent: 'space-between', paddingBottom: ds(40) },
     timerHeader: {
       paddingHorizontal: ds(24),
-      paddingTop: Platform.OS === 'ios' ? ds(80) : ds(44),
+      paddingTop: Platform.OS === 'ios' ? ds(110) : ds(80), // Increased padding to clear status bar/notch
       alignItems: 'center',
     },
     sessionTagBadge: {
@@ -987,19 +984,19 @@ export default function FocusScreen() {
       letterSpacing: -0.3,
     },
 
-    // Sprint progress bar
-    progressBarBg: {
-      height: ds(3),
-      backgroundColor: colors.surfaceContainer,
-      borderRadius: ds(2),
-      marginHorizontal: ds(24),
-      // increased spacing from header
-      marginTop: ds(24),
-      overflow: 'hidden',
+    // Center timer section
+    timerCenter: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: ds(40), // Space from sprint dots
+      overflow: 'visible', // Don't clip rings
     },
 
-    // Center timer section
-    timerCenter: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    timerContent: {
+      alignItems: 'center', // Horizontal center for breathe and ring
+    },
+
     ring: {
       width: ds(270),
       height: ds(270),
@@ -1011,6 +1008,7 @@ export default function FocusScreen() {
       borderColor: colors.surfaceContainer,
       overflow: 'hidden',
     },
+
     waveRing: {
       position: 'absolute',
       width: ds(292),
@@ -1018,6 +1016,15 @@ export default function FocusScreen() {
       borderRadius: ds(146),
       borderWidth: 1.5,
       borderColor: modeColor + '35',
+    },
+
+    waveRingOuter: {
+      position: 'absolute',
+      width: ds(310),
+      height: ds(310),
+      borderRadius: ds(155),
+      borderWidth: 1,
+      borderColor: modeColor + '20',
     },
 
     timeText: {
@@ -1036,7 +1043,11 @@ export default function FocusScreen() {
       textTransform: 'uppercase',
     },
 
-    breatheOverlay: { position: 'absolute', top: -ds(50), alignItems: 'center' },
+    breatheOverlay: {
+      alignItems: 'center',
+      zIndex: 10,
+      marginBottom: ds(24), // Relative space above ring
+    },
     breatheText: {
       fontSize: ds(13),
       fontWeight: '800',
@@ -1398,31 +1409,21 @@ export default function FocusScreen() {
           </Text>
         </Animated.View>
 
-        {/* Sprint progress bar */}
+        {/* Sprint progress dots */}
         {totalSprints > 1 && (
-          <>
-            <View style={s.progressBarBg}>
-              <Animated.View
-                style={{
-                  height: '100%',
-                  width: `${sprintProgress}%`,
-                  backgroundColor: currentThemeColor,
-                  borderRadius: ds(2),
-                }}
-              />
-            </View>
+          <View style={{ marginTop: ds(32) }}>
             <SprintDots
               total={totalSprints}
               completed={completedSprints}
               current={currentSprint}
               color={currentThemeColor}
             />
-          </>
+          </View>
         )}
 
-        {/* Timer ring */}
+        {/* Timer section with rings and breathe label */}
         <View style={s.timerCenter}>
-          {/* Outer wave ring */}
+          {/* Inner wave ring, outside main circle */}
           {status === 'focus' && isActive && (
             <Animated.View
               style={[
@@ -1445,75 +1446,75 @@ export default function FocusScreen() {
             />
           )}
 
-          {/* Second outer ring */}
+          {/* Outer wave ring */}
           {status === 'focus' && isActive && (
             <Animated.View
-              style={{
-                position: 'absolute',
-                width: ds(310),
-                height: ds(310),
-                borderRadius: ds(155),
-                borderWidth: 1,
-                borderColor: modeColor + '20',
-                transform: [
-                  {
-                    scale: wavyPulse.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [1.05, 1.2],
-                    }),
-                  },
-                ],
-                opacity: wavyPulse.interpolate({
-                  inputRange: [0, 0.5, 1],
-                  outputRange: [0.3, 0.1, 0.3],
-                }),
-              }}
+              style={[
+                s.waveRingOuter,
+                {
+                  transform: [
+                    {
+                      scale: wavyPulse.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [1.05, 1.2],
+                      }),
+                    },
+                  ],
+                  opacity: wavyPulse.interpolate({
+                    inputRange: [0, 0.5, 1],
+                    outputRange: [0.3, 0.1, 0.3],
+                  }),
+                },
+              ]}
             />
           )}
 
-          {/* Breathe label above ring */}
-          {isActive && (
-            <Animated.View style={[s.breatheOverlay, { opacity: breatheOpacity }]}>
-              <Text style={s.breatheText}>{breatheLabel}</Text>
-            </Animated.View>
-          )}
-
-          {/* Main timer ring */}
-          <Animated.View
-            style={[
-              s.ring,
-              {
-                transform: [{ scale: Animated.multiply(pulseAnim, timerScale) }],
-                borderColor: currentThemeColor + '25',
-              },
-            ]}
-          >
-            {/* Water fill animation */}
-            <WaterFill
-              percent={percent}
-              color={currentThemeColor}
-              isActive={isActive}
-            />
-
-            <Text style={s.timeText}>{formatTime(timeLeft)}</Text>
-            <Text style={s.phaseText}>{phaseLabel}</Text>
-
-            {/* Sprint label inside ring */}
-            {totalSprints > 1 && (
-              <Text
-                style={{
-                  fontSize: ds(10),
-                  color: colors.textVariant,
-                  opacity: 0.55,
-                  marginTop: ds(4),
-                  fontWeight: '700',
-                  letterSpacing: ds(1),
-                }}
-              >
-                SPRINT {currentSprint + 1} / {totalSprints}
-              </Text>
+          {/* Centered content for breathe label and ring */}
+          <View style={s.timerContent}>
+            {/* Breathe label, relatively positioned above ring */}
+            {isActive && (
+              <Animated.View style={[s.breatheOverlay, { opacity: breatheOpacity }]}>
+                <Text style={s.breatheText}>{breatheLabel}</Text>
+              </Animated.View>
             )}
-          </Animated.View>
+
+            {/* Main timer ring */}
+            <Animated.View
+              style={[
+                s.ring,
+                {
+                  transform: [{ scale: Animated.multiply(pulseAnim, timerScale) }],
+                  borderColor: currentThemeColor + '25',
+                },
+              ]}
+            >
+              {/* Water fill animation */}
+              <WaterFill
+                percent={percent}
+                color={currentThemeColor}
+                isActive={isActive}
+              />
+
+              <Text style={s.timeText}>{formatTime(timeLeft)}</Text>
+              <Text style={s.phaseText}>{phaseLabel}</Text>
+
+              {/* Sprint label inside ring */}
+              {totalSprints > 1 && (
+                <Text
+                  style={{
+                    fontSize: ds(10),
+                    color: colors.textVariant,
+                    opacity: 0.55,
+                    marginTop: ds(4),
+                    fontWeight: '700',
+                    letterSpacing: ds(1),
+                  }}
+                >
+                  SPRINT {currentSprint + 1} / {totalSprints}
+                </Text>
+              )}
+            </Animated.View>
+          </View>
         </View>
 
         {/* Controls */}
