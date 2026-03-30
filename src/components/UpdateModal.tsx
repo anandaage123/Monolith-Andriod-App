@@ -176,7 +176,6 @@ export default function UpdateModal({ manifest, onDismiss }: UpdateModalProps) {
     switch (dlState) {
       case 'downloading': return `Downloading… ${progressPercent}%`;
       case 'done':        return 'Tap to Install';
-      case 'error':       return 'View on GitHub';
       default:            return `Update to v${manifest.version}`;
     }
   };

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  Alert,
   Animated,
   Platform,
   Modal,
@@ -15,8 +14,8 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   StatusBar,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused } from '@react-navigation/native';
@@ -24,11 +23,12 @@ import { cacheDirectory, writeAsStringAsync, EncodingType } from 'expo-file-syst
 import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
+import { JSX } from 'react/jsx-runtime';
 
 const { width } = Dimensions.get('window');
 
-type Mood = '😀' | '😌' | '😐' | '😩' | '😡';
-const MOODS: Mood[] = ['😀', '😌', '😐', '😩', '😡'];
+type Mood = '😀' | '❤️' | '😐' | '😩' | '😡';
+const MOODS: Mood[] = ['😀', '❤️', '😐', '😩', '😡'];
 type ViewMode = 'list' | 'grid' | 'bento' | 'compact';
 
 const PALETTE = [
@@ -109,8 +109,24 @@ export default function NotesScreen() {
   const [newCatIcon, setNewCatIcon] = useState('📝');
   const [newCatColor, setNewCatColor] = useState(PALETTE[0]);
 
+  const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons: { text: string; onPress?: () => void; destructive?: boolean }[]; visible: boolean } | null>(null);
+
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const blinkAnim = useRef(new Animated.Value(1)).current;
+
+  // Custom alert handler
+  const showAlert = (title: string, message: string, buttons?: { text: string; onPress?: () => void; destructive?: boolean }[]) => {
+    setAlertConfig({
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK' }],
+      visible: true,
+    });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig(null);
+  };
 
   // ── Boot ───────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -170,11 +186,16 @@ export default function NotesScreen() {
 
   // ── PIN ────────────────────────────────────────────────────────────────────
   const handlePinInput = async (digit: string) => {
+    // Prevent input if already at 6 digits
+    if (pin.length >= 6) return;
+    
     const newPin = pin + digit;
-    if (newPin.length > 6) return;
     setPin(newPin);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    // Haptic feedback on input
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    // Easter egg: show hint with custom code
     if (newPin === '198921') {
       const saved = await AsyncStorage.getItem('@journal_pin_v3');
       if (saved) {
@@ -188,28 +209,51 @@ export default function NotesScreen() {
           ])
         ]).start(() => setTimeout(() => setShowHint(false), 1500));
       }
-      setPin(''); return;
+      setPin(''); 
+      return;
     }
 
+    // Handle when PIN is complete (6 digits)
     if (newPin.length === 6) {
+      // During PIN setup - first entry
       if (setupStep === 'set') {
-        setTempPin(newPin); setSetupStep('confirm'); setPin('');
-      } else if (setupStep === 'confirm') {
+        setTempPin(newPin);
+        setSetupStep('confirm');
+        setPin('');
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } 
+      // During PIN setup - confirmation entry
+      else if (setupStep === 'confirm') {
         if (newPin === tempPin) {
           await AsyncStorage.setItem('@journal_pin_v3', newPin);
-          setHasRegisteredPin(true); setIsAuthenticated(true); setSetupStep('none');
-          Alert.alert('Security Set', 'Your journal is now protected.');
-        } else {
-          setSetupStep('set'); setPin('');
-          Alert.alert('Mismatch', 'PINs did not match. Try again.');
-        }
-      } else {
-        const saved = await AsyncStorage.getItem('@journal_pin_v3');
-        if (newPin === saved) { setIsAuthenticated(true); setPin(''); }
-        else {
+          setHasRegisteredPin(true);
+          setIsAuthenticated(true);
+          setSetupStep('none');
           setPin('');
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          setTempPin('');
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          showAlert('✓ Security Set', 'Your journal is now protected with PIN security.');
+        } else {
+          setPin('');
+          setSetupStep('set');
+          setTempPin('');
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          showAlert('✗ PIN Mismatch', 'The two PINs do not match. Please try again.');
+        }
+      } 
+      // During authentication - unlock attempt
+      else {
+        const saved = await AsyncStorage.getItem('@journal_pin_v3');
+        if (newPin === saved) {
+          setIsAuthenticated(true);
+          setPin('');
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          setPin('');
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           Animated.sequence([
+            Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
+            Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
             Animated.timing(shakeAnim, { toValue: 10, duration: 50, useNativeDriver: true }),
             Animated.timing(shakeAnim, { toValue: -10, duration: 50, useNativeDriver: true }),
             Animated.timing(shakeAnim, { toValue: 0, duration: 50, useNativeDriver: true }),
@@ -217,6 +261,12 @@ export default function NotesScreen() {
         }
       }
     }
+  };
+
+  const handleBackspace = async () => {
+    if (pin.length === 0) return;
+    setPin(p => p.slice(0, -1));
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   // ── Note CRUD ──────────────────────────────────────────────────────────────
@@ -243,10 +293,10 @@ export default function NotesScreen() {
   };
 
   const deleteNote = async (id: string) => {
-    Alert.alert('Delete Entry', 'Remove this note permanently?', [
+    showAlert('Delete Entry', 'Remove this note permanently?', [
       { text: 'Cancel' },
       {
-        text: 'Delete', style: 'destructive', onPress: async () => {
+        text: 'Delete', destructive: true, onPress: async () => {
           const updated = notes.filter(n => n.id !== id);
           setNotes(updated);
           await AsyncStorage.setItem('@daily_notes_v3', JSON.stringify(updated));
@@ -265,7 +315,7 @@ export default function NotesScreen() {
 
   // ── Export ─────────────────────────────────────────────────────────────────
   const exportJournal = async () => {
-    if (notes.length === 0) { Alert.alert('Empty Journal', 'No entries to export.'); return; }
+    if (notes.length === 0) { showAlert('Empty Journal', 'No entries to export.'); return; }
     const exportContent = notes
       .map(n => `DATE: ${n.date}\nTITLE: ${n.title}\nCATEGORY: ${n.category}\nMOOD: ${n.mood ?? ''}\n\n${n.content ?? ''}\n\n${'─'.repeat(40)}`)
       .join('\n\n');
@@ -276,11 +326,29 @@ export default function NotesScreen() {
         await Sharing.shareAsync(filePath, { mimeType: 'text/plain', dialogTitle: 'Export Journal' });
       }
       setIsSettingsVisible(false);
-    } catch { Alert.alert('Export Error', 'Failed to generate file.'); }
+    } catch { showAlert('Export Error', 'Failed to generate file.'); }
   };
 
   const startPinSetup = () => {
-    setIsSettingsVisible(false); setSetupStep('set'); setIsAuthenticated(false); setPin('');
+    setIsSettingsVisible(false);
+    setSetupStep('set');
+    setIsAuthenticated(false);
+    setPin('');
+  };
+
+  const disablePinProtection = async () => {
+    showAlert('Disable PIN Protection', 'Remove PIN security? Your journal will be unprotected.', [
+      { text: 'Keep PIN' },
+      {
+        text: 'Disable', destructive: true, onPress: async () => {
+          await AsyncStorage.removeItem('@journal_pin_v3');
+          setHasRegisteredPin(false);
+          setIsAuthenticated(true);
+          setIsSettingsVisible(false);
+          showAlert('✓ PIN Disabled', 'Your journal is now unprotected.');
+        }
+      }
+    ]);
   };
 
   // ── Calendar helpers ───────────────────────────────────────────────────────
@@ -339,12 +407,12 @@ export default function NotesScreen() {
     hintText: { color: '#FFF', fontWeight: '800', fontSize: 13 },
     authHeading: { fontSize: 26, fontWeight: '800', textAlign: 'center', color: colors.text, marginBottom: 8 },
     authSubtext: { fontSize: 15, color: secondaryText, textAlign: 'center', marginBottom: 20 },
-    pinDisplay: { flexDirection: 'row', gap: 14, justifyContent: 'center', marginVertical: 30 },
-    pinDot: { width: 15, height: 15, borderRadius: 8, borderWidth: 2, borderColor: colors.primary },
+    pinDisplay: { flexDirection: 'row', gap: 12, justifyContent: 'center', marginVertical: 40 },
+    pinDot: { width: 18, height: 18, borderRadius: 9, borderWidth: 2.5, borderColor: colors.primary, backgroundColor: 'transparent' },
     pinDotActive: { backgroundColor: colors.primary },
-    keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'center' },
-    keypadBtn: { width: 76, height: 76, borderRadius: 38, backgroundColor: surfaceVariant, justifyContent: 'center', alignItems: 'center' },
-    keypadText: { fontSize: 24, fontWeight: '600', color: colors.text },
+    keypad: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 30, justifyContent: 'space-between', width: '100%' },
+    keypadBtn: { width: 80, height: 80, borderRadius: 16, backgroundColor: surfaceVariant, justifyContent: 'center', alignItems: 'center' },
+    keypadText: { fontSize: 28, fontWeight: '600', color: colors.text },
     // editor
     editorHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 8, gap: 10 },
     titleInput: { fontSize: 28, fontWeight: '800', paddingHorizontal: 20, color: colors.text, marginBottom: 8 },
@@ -388,42 +456,58 @@ export default function NotesScreen() {
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         {showHint && (
           <Animated.View style={[s.hintBadge, { opacity: blinkAnim }]}>
-            <Text style={s.hintText}>HINT: {hint}</Text>
+            <Text style={s.hintText}>{hint}</Text>
           </Animated.View>
         )}
-        <View style={s.authInner}>
-          <Animated.View style={{ transform: [{ translateX: shakeAnim }], alignItems: 'center', width: '100%' }}>
-            <Text style={s.authHeading}>
-              {setupStep === 'set' ? 'Set Security PIN' : setupStep === 'confirm' ? 'Confirm PIN' : 'Unlock Journal'}
-            </Text>
-            {setupStep !== 'none' && <Text style={s.authSubtext}>Create a 6-digit PIN to protect your notes.</Text>}
-          </Animated.View>
-          <View style={s.pinDisplay}>
-            {[...Array(6)].map((_, i) => (
-              <View key={i} style={[s.pinDot, pin.length > i && s.pinDotActive]} />
-            ))}
-          </View>
-          <View style={s.keypad}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => (
-              <TouchableOpacity key={d} style={s.keypadBtn} onPress={() => handlePinInput(d.toString())}>
-                <Text style={s.keypadText}>{d}</Text>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={s.authInner}>
+            <Animated.View style={{ transform: [{ translateX: shakeAnim }], alignItems: 'center', width: '100%' }}>
+              <Text style={s.authHeading}>
+                {setupStep === 'set' ? 'Set Security PIN' : setupStep === 'confirm' ? 'Confirm PIN' : 'Unlock Journal'}
+              </Text>
+              {setupStep !== 'none' && <Text style={s.authSubtext}>Create a 6-digit PIN to protect your notes.</Text>}
+            </Animated.View>
+            <View style={s.pinDisplay}>
+              {[...Array(6)].map((_, i) => (
+                <View key={i} style={[s.pinDot, pin.length > i && s.pinDotActive]} />
+              ))}
+            </View>
+            <View style={s.keypad}>
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => (
+                <TouchableOpacity 
+                  key={d} 
+                  style={s.keypadBtn} 
+                  onPress={() => handlePinInput(d.toString())}
+                  activeOpacity={0.6}
+                >
+                  <Text style={s.keypadText}>{d}</Text>
+                </TouchableOpacity>
+              ))}
+              {/* bottom row: spacer | 0 | backspace */}
+              <View style={[s.keypadBtn, { backgroundColor: 'transparent', elevation: 0 }]} />
+              <TouchableOpacity 
+                style={s.keypadBtn} 
+                onPress={() => handlePinInput('0')}
+                activeOpacity={0.6}
+              >
+                <Text style={s.keypadText}>0</Text>
               </TouchableOpacity>
-            ))}
-            {/* bottom row: invisible spacer | 0 | backspace */}
-            <View style={[s.keypadBtn, { backgroundColor: 'transparent', elevation: 0 }]} />
-            <TouchableOpacity style={s.keypadBtn} onPress={() => handlePinInput('0')}>
-              <Text style={s.keypadText}>0</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.keypadBtn} onPress={() => setPin(p => p.slice(0, -1))}>
-              <Ionicons name="backspace-outline" size={24} color={colors.text} />
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={[s.keypadBtn, { backgroundColor: pin.length === 0 ? surfaceVariant + '50' : surfaceVariant }]}
+                onPress={handleBackspace}
+                activeOpacity={0.6}
+                disabled={pin.length === 0}
+              >
+                <Ionicons name="backspace-outline" size={28} color={pin.length === 0 ? secondaryText + '50' : colors.text} />
+              </TouchableOpacity>
+            </View>
+            {setupStep !== 'none' && (
+              <TouchableOpacity style={{ marginTop: 28 }} onPress={() => { setSetupStep('none'); setPin(''); setIsAuthenticated(true); }}>
+                <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>Cancel</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          {setupStep !== 'none' && (
-            <TouchableOpacity style={{ marginTop: 28 }} onPress={() => { setSetupStep('none'); setPin(''); checkPinStatus(); }}>
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 15 }}>Cancel</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -651,9 +735,9 @@ export default function NotesScreen() {
                 <TouchableOpacity onPress={() => { setEditingCategory(cat); setNewCatName(cat.name); setNewCatIcon(cat.icon); setNewCatColor(cat.color); }} style={{ padding: 8, marginRight: 2 }}>
                   <Ionicons name="pencil-outline" size={18} color={secondaryText} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => Alert.alert('Delete Category', `Remove "${cat.name}"? Notes keep their category name.`, [
+                <TouchableOpacity onPress={() => showAlert('Delete Category', `Remove "${cat.name}"? Notes keep their category name.`, [
                   { text: 'Cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => saveCategories(categories.filter(c => c.name !== cat.name)) },
+                  { text: 'Delete', destructive: true, onPress: () => saveCategories(categories.filter(c => c.name !== cat.name)) },
                 ])} style={{ padding: 8 }}>
                   <Ionicons name="trash-outline" size={18} color="#FF3B30" />
                 </TouchableOpacity>
@@ -701,7 +785,7 @@ export default function NotesScreen() {
                     setEditingCategory(null);
                   } else {
                     if (categories.find(c => c.name.toLowerCase() === newCatName.trim().toLowerCase())) {
-                      Alert.alert('Already exists', 'A category with this name already exists.'); return;
+                      showAlert('Already exists', 'A category with this name already exists.'); return;
                     }
                     saveCategories([...categories, { name: newCatName.trim(), icon: newCatIcon, color: newCatColor }]);
                   }
@@ -730,6 +814,7 @@ export default function NotesScreen() {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* App Bar */}
+      <View style={{ height: 40 }} />
       <View style={s.appBar}>
         <Text style={s.logoText}>Journal</Text>
         <View style={s.headerIcons}>
@@ -879,6 +964,7 @@ export default function NotesScreen() {
       {/* ═══ Editor Modal ═══ */}
       <Modal visible={isEditing || isViewing} animationType="slide">
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ height: 20 }} />
           <View style={s.editorHeader}>
             <TouchableOpacity onPress={() => { setIsEditing(false); setIsViewing(false); }} style={{ padding: 4 }}>
               <Ionicons name="close" size={24} color={colors.text} />
@@ -1006,12 +1092,18 @@ export default function NotesScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={s.actionRow} onPress={startPinSetup}>
               <Ionicons name="lock-closed-outline" size={22} color={colors.text} />
-              <Text style={s.actionText}>Reset Security PIN</Text>
+              <Text style={s.actionText}>{hasRegisteredPin ? 'Reset Security PIN' : 'Set Security PIN'}</Text>
             </TouchableOpacity>
+            {hasRegisteredPin && (
+              <TouchableOpacity style={[s.actionRow, { backgroundColor: '#FF3B3012' }]} onPress={disablePinProtection}>
+                <Ionicons name="lock-open-outline" size={22} color="#FF3B30" />
+                <Text style={[s.actionText, { color: '#FF3B30' }]}>Disable PIN Protection</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={[s.actionRow, { backgroundColor: '#FF3B3012', marginBottom: 0 }]} onPress={() => {
-              Alert.alert('Delete All', 'Clear all entries permanently?', [
+              showAlert('Delete All', 'Clear all entries permanently?', [
                 { text: 'Cancel' },
-                { text: 'Wipe', style: 'destructive', onPress: async () => { setNotes([]); await AsyncStorage.removeItem('@daily_notes_v3'); setIsSettingsVisible(false); } },
+                { text: 'Wipe', destructive: true, onPress: async () => { setNotes([]); await AsyncStorage.removeItem('@daily_notes_v3'); setIsSettingsVisible(false); } },
               ]);
             }}>
               <Ionicons name="trash-outline" size={22} color="#FF3B30" />
@@ -1023,6 +1115,48 @@ export default function NotesScreen() {
 
       {/* ═══ Category Manager ═══ */}
       <CategoryManager />
+
+      {/* ═══ Custom Alert Modal ═══ */}
+      {alertConfig?.visible && (
+        <Modal visible={alertConfig.visible} transparent animationType="fade">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
+            <View style={{ backgroundColor: cardBg, borderRadius: 20, padding: 24, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, maxWidth: '90%' }}>
+              {/* Title */}
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 8 }}>
+                {alertConfig.title}
+              </Text>
+              {/* Message */}
+              <Text style={{ fontSize: 15, color: secondaryText, lineHeight: 22, marginBottom: 24 }}>
+                {alertConfig.message}
+              </Text>
+              {/* Buttons */}
+              <View style={{ gap: 10 }}>
+                {alertConfig.buttons.map((btn, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                      backgroundColor: btn.destructive ? '#FF3B30' : btn.text === 'OK' || btn.text === 'Keep PIN' ? surfaceVariant : colors.primary,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      btn.onPress?.();
+                      closeAlert();
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: btn.destructive || (btn.text !== 'OK' && btn.text !== 'Keep PIN') ? '#FFF' : colors.text }}>
+                      {btn.text}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }

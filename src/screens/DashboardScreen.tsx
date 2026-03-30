@@ -173,6 +173,8 @@ export default function DashboardScreen() {
   const [isAddingHabit, setIsAddingHabit] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [habitToDelete, setHabitToDelete] = useState<string | null>(null);
 
   // Weather & Quote State
   const [weather, setWeather] = useState<{ temp: number, desc: string, icon: any, status: string } | null>(null);
@@ -192,6 +194,7 @@ export default function DashboardScreen() {
   const slideAnims = useRef(sectionAnims.map(() => new Animated.Value(15))).current;
   const habitScale = useRef(new Animated.Value(1)).current;
   const quoteTranslateX = useRef(new Animated.Value(0)).current;
+  const habitDeleteAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     loadEssentialData();
@@ -405,9 +408,18 @@ export default function DashboardScreen() {
   };
 
   const deleteHabit = (id: string) => {
-    const updated = habits.filter(h => h.id !== id);
-    setHabits(updated);
-    AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+    Animated.timing(habitDeleteAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      const updated = habits.filter(h => h.id !== id);
+      setHabits(updated);
+      AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+      setDeleteConfirmVisible(false);
+      setHabitToDelete(null);
+      habitDeleteAnim.setValue(1);
+    });
   };
 
   const addHabit = () => {
@@ -517,7 +529,7 @@ export default function DashboardScreen() {
             </View>
             <View style={styles.habitsGrid}>
               {habits.map((habit) => (
-                <Animated.View key={habit.id} style={{ transform: [{ scale: habitScale }] }}>
+                <Animated.View key={habit.id} style={{ transform: [{ scale: habitScale }], opacity: habitToDelete === habit.id ? habitDeleteAnim : 1 }}>
                   <Pressable
                     style={({ pressed }) => [
                       styles.habitItem,
@@ -525,7 +537,10 @@ export default function DashboardScreen() {
                       { opacity: pressed ? 0.7 : (habit.completed ? 0.6 : 1) }
                     ]}
                     onPress={() => toggleHabit(habit.id)}
-                    onLongPress={() => deleteHabit(habit.id)}
+                    onLongPress={() => {
+                      setHabitToDelete(habit.id);
+                      setDeleteConfirmVisible(true);
+                    }}
                   >
                     <View style={styles.habitMain}>
                       <View style={[styles.checkbox, habit.completed && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
@@ -539,7 +554,10 @@ export default function DashboardScreen() {
                         <Text style={styles.habitMeta}>{habit.count} streak</Text>
                       </View>
                     </View>
-                    <Pressable onPress={() => deleteHabit(habit.id)} style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.7 : 1 }]}>
+                    <Pressable onPress={() => {
+                      setHabitToDelete(habit.id);
+                      setDeleteConfirmVisible(true);
+                    }} style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.7 : 1 }]}>
                       <Ionicons name="close" size={18} color={colors.textVariant} />
                     </Pressable>
                   </Pressable>
@@ -669,6 +687,49 @@ export default function DashboardScreen() {
             >
               <Text style={styles.saveBtnText}>Infuse into Rituals</Text>
             </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Habit Confirmation Modal */}
+      <Modal visible={deleteConfirmVisible} transparent animationType="fade">
+        <View style={[styles.modalOverlay, { justifyContent: 'center' }]}>
+          <View style={styles.modalContent}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.error + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+                <MaterialCommunityIcons name="trash-can-outline" size={32} color={colors.error} />
+              </View>
+              <Text style={styles.modalTitle}>Remove Ritual?</Text>
+              <Text style={[styles.saveBtnText, { color: colors.textVariant, marginTop: 12, fontSize: 15 }]}>This habit will be permanently removed from your daily rituals.</Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  {
+                    flex: 1,
+                    backgroundColor: colors.surface,
+                    opacity: pressed ? 0.7 : 1
+                  }
+                ]}
+                onPress={() => setDeleteConfirmVisible(false)}
+              >
+                <Text style={[styles.saveBtnText, { color: colors.textVariant }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.saveBtn,
+                  {
+                    flex: 1,
+                    backgroundColor: colors.error,
+                    opacity: pressed ? 0.7 : 1
+                  }
+                ]}
+                onPress={() => habitToDelete && deleteHabit(habitToDelete)}
+              >
+                <Text style={styles.saveBtnText}>Remove</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>

@@ -40,6 +40,8 @@ export default function TodosScreen() {
   const [selectedPriority, setSelectedPriority] = useState<Priority>('med');
   const [isAdding, setIsAdding] = useState(false);
   const [isClearModalVisible, setIsClearModalVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [todoToDelete, setTodoToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadTodos();
@@ -94,6 +96,8 @@ export default function TodosScreen() {
 
   const deleteTodo = (id: string) => {
       saveTodos(todos.filter(t => t.id !== id));
+      setDeleteConfirmVisible(false);
+      setTodoToDelete(null);
   };
 
   const confirmClear = () => {
@@ -257,6 +261,7 @@ export default function TodosScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={{ height: 30 }} />
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
       <FlatList
@@ -293,10 +298,8 @@ export default function TodosScreen() {
             style={styles.todoCard}
             onPress={() => toggleTodo(item.id)}
             onLongPress={() => {
-              Alert.alert('Delete Task', 'Remove this task?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => deleteTodo(item.id) }
-              ]);
+              setTodoToDelete(item.id);
+              setDeleteConfirmVisible(true);
             }}
           >
             <View style={[styles.checkbox, item.completed && styles.checkboxActive]}>
@@ -390,6 +393,27 @@ export default function TodosScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.clearConfirm} onPress={confirmClear}>
                      <Text style={styles.submitBtnText}>Sweep All</Text>
+                  </TouchableOpacity>
+               </View>
+            </View>
+         </View>
+      </Modal>
+
+      {/* Delete Task Confirmation Modal */}
+      <Modal visible={deleteConfirmVisible} transparent animationType="fade">
+         <View style={[styles.modalOverlay, { justifyContent: 'center', padding: 24 }]}>
+            <View style={styles.clearCard}>
+               <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.error + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
+                  <MaterialCommunityIcons name="trash-can-outline" size={32} color={colors.error} />
+               </View>
+               <Text style={styles.clearTitle}>Delete Task?</Text>
+               <Text style={styles.clearSub}>This action cannot be undone. The task will be permanently removed.</Text>
+               <View style={styles.clearActions}>
+                  <TouchableOpacity style={styles.clearCancel} onPress={() => setDeleteConfirmVisible(false)}>
+                     <Text style={[styles.submitBtnText, { color: colors.textVariant }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.clearConfirm} onPress={() => todoToDelete && deleteTodo(todoToDelete)}>
+                     <Text style={styles.submitBtnText}>Delete</Text>
                   </TouchableOpacity>
                </View>
             </View>

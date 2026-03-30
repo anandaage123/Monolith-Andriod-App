@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,15 @@ import {
   SectionList,
   TextInput,
   Modal,
-  Alert,
   Dimensions,
   Platform,
   StatusBar,
   KeyboardAvoidingView,
   ScrollView,
   FlatList,
-  Pressable
+  Pressable,
+  Animated,
+  Easing
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -76,6 +77,30 @@ export default function BudgetScreen() {
   const [type, setType] = useState<'income' | 'expense'>('expense');
   const [category, setCategory] = useState('Others');
   const [comment, setComment] = useState('');
+  const [amountError, setAmountError] = useState('');
+
+  // Animation refs
+  const summaryCardAnim = useRef(new Animated.Value(0)).current;
+  const transactionListAnim = useRef(new Animated.Value(0)).current;
+  const fabScaleAnim = useRef(new Animated.Value(0.8)).current;
+  const amountShakeAnim = useRef(new Animated.Value(0)).current;
+
+  // Custom alert state
+  const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons: { text: string; onPress?: () => void; destructive?: boolean }[]; visible: boolean } | null>(null);
+
+  // Custom alert handler
+  const showAlert = (title: string, message: string, buttons?: { text: string; onPress?: () => void; destructive?: boolean }[]) => {
+    setAlertConfig({
+      title,
+      message,
+      buttons: buttons || [{ text: 'OK' }],
+      visible: true,
+    });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig(null);
+  };
 
   const currentBudgetLimit = budgets[`${selectedMonth}-${selectedYear}`] || 4500;
 
@@ -192,18 +217,19 @@ export default function BudgetScreen() {
       marginBottom: 28,
     },
     categoryList: { marginBottom: 28 },
-    catItem: { alignItems: 'center', marginRight: 20, width: 70 },
+    catItem: { alignItems: 'center', marginBottom: 16, flex: 1, maxWidth: '25%' },
     catIconBox: {
-      width: 56,
-      height: 56,
-      borderRadius: 18,
+      width: 44,
+      height: 44,
+      borderRadius: 16,
       backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: 8,
+      marginBottom: 6,
     },
     catIconBoxActive: { backgroundColor: colors.primary },
     catName: { ...Typography.caption, fontSize: 11, fontWeight: '700', textAlign: 'center' },
+    errorText: { ...Typography.caption, color: colors.error, marginTop: 8, textAlign: 'center' },
 
     submitBtn: {
       backgroundColor: colors.primary,
@@ -215,7 +241,7 @@ export default function BudgetScreen() {
     submitBtnText: { color: '#FFF', fontWeight: '800', fontSize: 17 },
     inputGroup: { marginBottom: 28 },
     amountInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 28 },
-    currency: { ...Typography.header, fontSize: 32, color: colors.textVariant, marginRight: 8 },
+    currency: { ...Typography.header, fontSize: 48, color: colors.textVariant, marginRight: 8 },
     monthCard: {
       width: '30%',
       aspectRatio: 1,
@@ -232,7 +258,35 @@ export default function BudgetScreen() {
 
   useEffect(() => {
     loadData();
+    startAnimations();
   }, [isFocused]);
+
+  const startAnimations = () => {
+    summaryCardAnim.setValue(0);
+    transactionListAnim.setValue(0);
+    fabScaleAnim.setValue(0.8);
+
+    Animated.stagger(150, [
+      Animated.timing(summaryCardAnim, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(transactionListAnim, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(fabScaleAnim, {
+        toValue: 1,
+        duration: 400,
+        easing: Easing.out(Easing.back(1.2)),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   const loadData = async () => {
     try {
@@ -266,7 +320,8 @@ export default function BudgetScreen() {
   const addTransaction = () => {
     const val = parseFloat(amount);
     if (!val || val <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+      setAmountError('Please enter a valid amount');
+      triggerShake();
       return;
     }
 
@@ -283,14 +338,39 @@ export default function BudgetScreen() {
     setAmount('');
     setComment('');
     setCategory('Others');
+    setAmountError('');
     setIsAdding(false);
   };
 
+  const triggerShake = () => {
+    const shakeSequence = [
+      Animated.timing(amountShakeAnim, {
+        toValue: -10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(amountShakeAnim, {
+        toValue: 10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(amountShakeAnim, {
+        toValue: -10,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+      Animated.timing(amountShakeAnim, {
+        toValue: 0,
+        duration: 50,
+        useNativeDriver: true,
+      }),
+    ];
+
+    Animated.sequence(shakeSequence).start();
+  };
+
   const deleteTransaction = (id: string) => {
-    Alert.alert('Delete', 'Delete this transaction?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => saveData(transactions.filter(t => t.id !== id)) }
-    ]);
+    saveData(transactions.filter(t => t.id !== id));
   };
 
   const filteredTransactions = useMemo(() => {
@@ -332,6 +412,7 @@ export default function BudgetScreen() {
 
   return (
     <View style={styles.container}>
+      <View style={{ height: 30 }} />
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
       
       <View style={styles.header}>
@@ -346,32 +427,43 @@ export default function BudgetScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.summaryCard}>
+        <Animated.View style={[
+          styles.summaryCard,
+          {
+            opacity: summaryCardAnim,
+            transform: [{
+              scale: summaryCardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.95, 1],
+              })
+            }]
+          }
+        ]}>
           <Text style={styles.summaryLabel}>REMAINING BUDGET</Text>
           <Text style={[styles.balanceText, { color: (currentBudgetLimit - totals.expense) < 0 ? colors.error : colors.text }]}>
-            ${(currentBudgetLimit - totals.expense).toFixed(0)}
+            ₹{(currentBudgetLimit - totals.expense).toFixed(0)}
           </Text>
           
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Income</Text>
-              <Text style={[styles.statValue, { color: colors.tertiary }]}>+${totals.income.toFixed(0)}</Text>
+              <Text style={[styles.statValue, { color: colors.tertiary }]}>+₹{totals.income.toFixed(0)}</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Spent</Text>
-              <Text style={[styles.statValue, { color: colors.error }]}>-${totals.expense.toFixed(0)}</Text>
+              <Text style={[styles.statValue, { color: colors.error }]}>-₹{totals.expense.toFixed(0)}</Text>
             </View>
             <View style={styles.divider} />
             <TouchableOpacity style={styles.statItem} onPress={() => setIsSettingsOpen(true)}>
               <Text style={styles.statLabel}>Limit</Text>
               <View style={{flexDirection: 'row', alignItems: 'center', gap: 4}}>
-                <Text style={styles.statValue}>${currentBudgetLimit.toFixed(0)}</Text>
+                <Text style={styles.statValue}>₹{currentBudgetLimit.toFixed(0)}</Text>
                 <Ionicons name="pencil" size={12} color={colors.textVariant} />
               </View>
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </View>
 
       <SectionList
@@ -386,9 +478,9 @@ export default function BudgetScreen() {
           <TouchableOpacity 
             style={styles.transactionCard}
             onLongPress={() => {
-              Alert.alert('Delete Entry', 'Remove this transaction?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => deleteTransaction(item.id) }
+              showAlert('Delete Entry', 'Remove this transaction?', [
+                { text: 'Cancel' },
+                { text: 'Delete', destructive: true, onPress: () => deleteTransaction(item.id) }
               ]);
             }}
           >
@@ -404,7 +496,7 @@ export default function BudgetScreen() {
               {item.comment ? <Text style={styles.txComment}>{item.comment}</Text> : null}
             </View>
             <Text style={[styles.txAmount, { color: item.type === 'expense' ? colors.error : colors.tertiary }]}>
-              {item.type === 'expense' ? '-' : '+'}${item.amount.toFixed(0)}
+              {item.type === 'expense' ? '-' : '+'}₹{item.amount.toFixed(0)}
             </Text>
           </TouchableOpacity>
         )}
@@ -417,11 +509,20 @@ export default function BudgetScreen() {
         contentContainerStyle={{ paddingBottom: 100 }}
       />
 
-      <TouchableOpacity style={styles.fab} onPress={() => setIsAdding(true)}>
-        <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.fabGradient}>
-          <Ionicons name="add" size={32} color="#FFF" />
-        </LinearGradient>
-      </TouchableOpacity>
+      <Animated.View style={[
+        styles.fab,
+        {
+          transform: [{
+            scale: fabScaleAnim
+          }]
+        }
+      ]}>
+        <TouchableOpacity style={{flex: 1}} onPress={() => setIsAdding(true)}>
+          <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.fabGradient}>
+            <Ionicons name="add" size={32} color="#FFF" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Add Transaction Modal */}
       <Modal visible={isAdding} animationType="slide" transparent>
@@ -451,36 +552,42 @@ export default function BudgetScreen() {
               </View>
 
               <View style={styles.amountInputRow}>
-                <Text style={styles.currency}>$</Text>
-                <TextInput
-                  style={styles.amountInput}
-                  placeholder="0"
-                  placeholderTextColor={colors.textVariant}
-                  keyboardType="numeric"
-                  value={amount}
-                  onChangeText={setAmount}
-                  autoFocus
-                />
+                <Animated.View style={{
+                  transform: [{ translateX: amountShakeAnim }],
+                }}>
+                  <TextInput
+                    style={styles.amountInput}
+                    placeholder="0"
+                    placeholderTextColor={colors.textVariant}
+                    keyboardType="numeric"
+                    value={amount}
+                    onChangeText={(text) => {
+                      setAmount(text);
+                      if (amountError) setAmountError('');
+                    }}
+                    maxLength={10}
+                    autoFocus
+                  />
+                </Animated.View>
               </View>
+              {amountError && <Text style={styles.errorText}>{amountError}</Text>}
 
               <View style={styles.categoryList}>
                 <Text style={styles.inputLabel}>CATEGORY</Text>
-                <FlatList
-                   horizontal
-                   showsHorizontalScrollIndicator={false}
-                   data={CATEGORIES[type]}
-                   renderItem={({ item }) => (
-                     <TouchableOpacity 
-                       style={styles.catItem}
-                       onPress={() => setCategory(item.name)}
-                     >
-                       <View style={[styles.catIconBox, category === item.name && { backgroundColor: type === 'expense' ? colors.error : colors.tertiary }]}>
-                         <Ionicons name={item.icon as any} size={22} color={category === item.name ? '#FFF' : colors.text} />
-                       </View>
-                       <Text style={[styles.catName, { color: category === item.name ? colors.primary : colors.textVariant }]}>{item.name}</Text>
-                     </TouchableOpacity>
-                   )}
-                />
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', width: '100%' }}>
+                  {CATEGORIES[type].map((item) => (
+                    <TouchableOpacity 
+                      key={item.name}
+                      style={styles.catItem}
+                      onPress={() => setCategory(item.name)}
+                    >
+                      <View style={[styles.catIconBox, category === item.name && { backgroundColor: type === 'expense' ? colors.error : colors.tertiary }]}>
+                        <Ionicons name={item.icon as any} size={20} color={category === item.name ? '#FFF' : colors.text} />
+                      </View>
+                      <Text style={[styles.catName, { color: category === item.name ? colors.primary : colors.textVariant }]}>{item.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               <View style={styles.inputGroup}>
@@ -551,13 +658,15 @@ export default function BudgetScreen() {
             <Text style={styles.sheetTitle}>Set Budget Limit</Text>
             <Text style={[styles.txComment, { marginBottom: 20 }]}>For {selectedMonth} {selectedYear}</Text>
             <View style={styles.amountInputRow}>
-              <Text style={styles.currency}>$</Text>
+              <Text style={styles.currency}>₹</Text>
               <TextInput
-                style={[styles.amountInput, { fontSize: 36 }]}
+                style={[styles.amountInput, { fontSize: 48 }]}
                 defaultValue={currentBudgetLimit.toString()}
                 keyboardType="numeric"
-                onEndEditing={(e) => updateBudgetLimit(parseFloat(e.nativeEvent.text) || 0)}
+                onChangeText={(text) => updateBudgetLimit(parseFloat(text) || 0)}
+                maxLength={10}
                 autoFocus
+                caretHidden={true}
               />
             </View>
             <TouchableOpacity style={styles.submitBtn} onPress={() => setIsSettingsOpen(false)}>
@@ -566,6 +675,48 @@ export default function BudgetScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ═══ Custom Alert Modal ═══ */}
+      {alertConfig?.visible && (
+        <Modal visible={alertConfig.visible} transparent animationType="fade">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 20 }}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: 20, padding: 24, elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, maxWidth: '90%' }}>
+              {/* Title */}
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, marginBottom: 8 }}>
+                {alertConfig.title}
+              </Text>
+              {/* Message */}
+              <Text style={{ fontSize: 15, color: colors.textVariant, lineHeight: 22, marginBottom: 24 }}>
+                {alertConfig.message}
+              </Text>
+              {/* Buttons */}
+              <View style={{ gap: 10 }}>
+                {alertConfig.buttons.map((btn, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                      backgroundColor: btn.destructive ? colors.error : btn.text === 'OK' || btn.text === 'Cancel' ? colors.background : colors.primary,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                    onPress={() => {
+                      btn.onPress?.();
+                      closeAlert();
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: btn.destructive || (btn.text !== 'OK' && btn.text !== 'Cancel') ? '#FFF' : colors.text }}>
+                      {btn.text}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }

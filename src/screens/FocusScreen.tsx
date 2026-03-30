@@ -1101,6 +1101,8 @@ export default function FocusScreen() {
       >
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
+        <View style={{ height: 30 }} />
+
         <View style={s.header}>
           <Text style={s.title}>Focus</Text>
           <Text style={s.sub}>Set your intention and begin.</Text>
