@@ -29,6 +29,9 @@ interface Note {
   mood?: string;
   category: string;
   isPinned?: boolean;
+  extras?: {
+    journalNotes?: { id: string; text: string; time: string }[];
+  };
 }
 
 const NOTES_KEY = '@daily_notes_v3';
@@ -126,14 +129,16 @@ function buildDailyLogContent(dayKey: DayKey, events: DailyLogEvent[]): string {
     if (completedHabits.length > 0) {
       lines.push('Habits:');
       completedHabits.forEach(h => {
-        lines.push(`- ✓ ${h.title}${h.details ? ` (${h.details})` : ''}`);
+        const at = formatTime(h.createdAt);
+        lines.push(`- ${at} ✓ ${h.title}${h.details ? ` (${h.details})` : ''}`);
       });
       lines.push('');
     }
     if (completedTodos.length > 0) {
       lines.push('Todos:');
       completedTodos.forEach(t => {
-        lines.push(`- ✓ ${t.title}${t.details ? ` (${t.details})` : ''}`);
+        const at = formatTime(t.createdAt);
+        lines.push(`- ${at} ✓ ${t.title}${t.details ? ` (${t.details})` : ''}`);
       });
     }
   }
@@ -154,13 +159,14 @@ async function upsertDailyLogNote(dayKey: DayKey, events: DailyLogEvent[]): Prom
     content,
     date: formatNoteDate(dateRaw),
     dateRaw,
-    mood: '😐',
+    mood: '😀',
     category: 'Work',
     isPinned: false,
   };
 
-  const exists = notes.some(n => n.id === id);
-  const updated = exists ? notes.map(n => (n.id === id ? { ...n, ...note } : n)) : [note, ...notes];
+  const existing = notes.find(n => n.id === id);
+  const merged: Note = existing ? { ...existing, ...note, extras: existing.extras } : note;
+  const updated = existing ? notes.map(n => (n.id === id ? merged : n)) : [note, ...notes];
   await saveNotes(updated);
 }
 

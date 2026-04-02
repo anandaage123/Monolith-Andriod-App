@@ -45,13 +45,18 @@ interface Category {
   icon: string;
 }
 
-const DEFAULT_CATEGORIES: Category[] = [
-  { name: 'Personal', color: '#FF6B6B', icon: '🏠' },
-  { name: 'Work', color: '#4ECDC4', icon: '💼' },
-  { name: 'Ideas', color: '#FFE66D', icon: '💡' },
-  { name: 'Travel', color: '#A8E6CF', icon: '✈️' },
-  { name: 'Dreams', color: '#C9B1FF', icon: '🌙' },
-];
+// Categories were removed from the journal UI (kept only for backward compatibility with stored notes).
+
+interface JournalNote {
+  id: string;
+  text: string;
+  time: string;
+}
+
+interface NoteExtras {
+  manualNotes?: string;
+  journalNotes?: JournalNote[];
+}
 
 interface Note {
   id: string;
@@ -60,8 +65,9 @@ interface Note {
   date: string;
   dateRaw: number;
   mood?: Mood;
-  category: string;
+  category: string; // legacy field kept for existing stored data
   isPinned?: boolean;
+  extras?: NoteExtras;
 }
 
 const formatDate = (ts: number) =>
@@ -90,8 +96,6 @@ export default function NotesScreen() {
   const [tempPin, setTempPin] = useState('');
 
   const [notes, setNotes] = useState<Note[]>([]);
-  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const [calendarVisible, setCalendarVisible] = useState(false);
@@ -104,17 +108,14 @@ export default function NotesScreen() {
   const [currentNote, setCurrentNote] = useState<Partial<Note>>({});
 
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
-  const [isCategoryMgrVisible, setIsCategoryMgrVisible] = useState(false);
 
   const [hint, setHint] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [newCatName, setNewCatName] = useState('');
-  const [newCatIcon, setNewCatIcon] = useState('📝');
-  const [newCatColor, setNewCatColor] = useState(PALETTE[0]);
+  const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
+  const [manualSelection, setManualSelection] = useState({ start: 0, end: 0 });
 
   const [alertConfig, setAlertConfig] = useState<{ title: string; message: string; buttons: { text: string; onPress?: () => void; destructive?: boolean }[]; visible: boolean } | null>(null);
 
@@ -139,7 +140,6 @@ export default function NotesScreen() {
   useEffect(() => {
     checkPinStatus();
     loadNotes();
-    loadCategories();
   }, [isFocused]);
 
   const checkPinStatus = async () => {
@@ -153,25 +153,98 @@ export default function NotesScreen() {
     if (stored) setNotes(JSON.parse(stored));
   };
 
-  const loadCategories = async () => {
-    const stored = await AsyncStorage.getItem('@journal_categories_v1');
-    if (stored) setCategories(JSON.parse(stored));
+  const hashToIndex = (s: string, mod: number) => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return h % mod;
   };
 
-  const saveCategories = async (cats: Category[]) => {
-    setCategories(cats);
-    await AsyncStorage.setItem('@journal_categories_v1', JSON.stringify(cats));
+  const accentForNote = (note?: Partial<Note>) => {
+    if (!note) return colors.primary;
+    if (isDailyLogNote(note)) return colors.primary;
+    const key = note.id || `${note.title ?? ''}-${note.dateRaw ?? ''}`;
+    return PALETTE[hashToIndex(key, PALETTE.length)];
   };
 
-  // ── Category helpers ───────────────────────────────────────────────────────
-  const getCategoryColor = (name: string) =>
-    (categories.find(c => c.name === name) ?? { color: colors.primary }).color;
-  const getCategoryIcon = (name: string) =>
-    (categories.find(c => c.name === name) ?? { icon: '📝' }).icon;
+  const iconForNote = (note?: Partial<Note>) => {
+    if (!note) return '📝';
+    if (isDailyLogNote(note)) return '📅';
+    return note.mood || '📝';
+  };
 
   const isDailyLogNote = (note?: Partial<Note>) =>
     !!note?.id?.startsWith('daily-log-') ||
     (note?.content?.includes('\nTIMESHEET\n') && note?.content?.includes('\nCOMPLETED\n'));
+
+  const insertCurrentTimeAtCursor = () => {
+    const isAuto = isDailyLogNote(currentNote);
+    const target = isAuto ? (currentNote.extras?.manualNotes ?? '') : (currentNote.content ?? '');
+    const selection = isAuto ? manualSelection : contentSelection;
+    const selStart = Math.max(0, Math.min(selection.start, target.length));
+    const selEnd = Math.max(selStart, Math.min(selection.end, target.length));
+    const before = target.slice(0, selStart);
+    const after = target.slice(selEnd);
+    const needsNewline = before.length > 0 && !before.endsWith('\n');
+    const time = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const stamp = `${needsNewline ? '\n' : ''}${time} `;
+    const nextText = `${before}${stamp}${after}`;
+    const caret = before.length + stamp.length;
+    if (isAuto) {
+      setCurrentNote({
+        ...currentNote,
+        extras: { ...(currentNote.extras ?? {}), manualNotes: nextText },
+      });
+      setManualSelection({ start: caret, end: caret });
+    } else {
+      setCurrentNote({ ...currentNote, content: nextText });
+      setContentSelection({ start: caret, end: caret });
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const parseTimestampLine = (line: string) => {
+    const match = line.match(/^(\d{1,2}:\d{2}\s?[APMapm]{2})(.*)$/);
+    if (!match) return null;
+    return {
+      time: match[1].trim(),
+      body: (match[2] ?? '').trim(),
+    };
+  };
+
+  const getManualText = (note?: Partial<Note>) => {
+    if (!note?.extras) return '';
+    if ((note.extras.manualNotes ?? '').trim().length > 0) return note.extras.manualNotes ?? '';
+    const legacy = note.extras.journalNotes ?? [];
+    return legacy.map(j => `${j.time} ${j.text}`.trim()).join('\n');
+  };
+
+  const parseJournalBlocks = (text?: string): { time?: string; body: string }[] => {
+    const lines = (text ?? '').split('\n').map(l => l.trimEnd());
+    const blocks: { time?: string; body: string }[] = [];
+    let current: { time?: string; bodyLines: string[] } | null = null;
+
+    const pushCurrent = () => {
+      if (!current) return;
+      const body = current.bodyLines.join('\n').trim();
+      if (body.length > 0 || current.time) blocks.push({ time: current.time, body });
+      current = null;
+    };
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      const parsed = parseTimestampLine(line);
+      if (parsed) {
+        pushCurrent();
+        current = { time: parsed.time, bodyLines: parsed.body ? [parsed.body] : [] };
+      } else {
+        if (!current) current = { bodyLines: [] };
+        current.bodyLines.push(line);
+      }
+    }
+    pushCurrent();
+    return blocks;
+  };
 
   const parseDailyLog = (content?: string): { timesheet: DailyLogSection[]; completed: DailyLogSection[] } => {
     const safe = content ?? '';
@@ -208,7 +281,6 @@ export default function NotesScreen() {
 
   // ── Filtering ──────────────────────────────────────────────────────────────
   const filteredNotes = notes.filter(n => {
-    if (selectedCategory !== 'All' && n.category !== selectedCategory) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       if (!n.title.toLowerCase().includes(q) && !n.content.toLowerCase().includes(q)) return false;
@@ -323,9 +395,10 @@ export default function NotesScreen() {
       content: currentNote.content || '',
       date: formatDate(ts),
       dateRaw: currentNote.dateRaw || ts,
-      mood: currentNote.mood || '😐',
-      category: currentNote.category || 'Personal',
+      mood: currentNote.mood || '😀',
+      category: currentNote.category || 'General',
       isPinned: currentNote.isPinned || false,
+      extras: currentNote.extras,
     };
     const updated = currentNote.id
       ? notes.map(n => n.id === currentNote.id ? newNote : n)
@@ -557,11 +630,17 @@ export default function NotesScreen() {
   }
 
   // ── Card renderers ─────────────────────────────────────────────────────────
-  const openNote = (note: Note) => { setCurrentNote(note); setIsViewing(true); };
+  const openNote = (note: Note) => {
+    setCurrentNote(note);
+    setContentSelection({ start: (note.content ?? '').length, end: (note.content ?? '').length });
+    const manual = note.extras?.manualNotes ?? '';
+    setManualSelection({ start: manual.length, end: manual.length });
+    setIsViewing(true);
+  };
 
   const renderListCard = (note: Note) => {
-    const color = getCategoryColor(note.category);
-    const icon = getCategoryIcon(note.category);
+    const color = accentForNote(note);
+    const icon = iconForNote(note);
     return (
       <TouchableOpacity
         key={note.id}
@@ -582,9 +661,9 @@ export default function NotesScreen() {
         </View>
         <Text style={s.noteSnippet} numberOfLines={2}>{note.content}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, gap: 6 }}>
-          <View style={{ backgroundColor: color + '25', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Text style={{ fontSize: 11 }}>{icon}</Text>
-            <Text style={{ fontSize: 11, fontWeight: '800', color, letterSpacing: 0.3 }}>{note.category.toUpperCase()}</Text>
+          <View style={{ backgroundColor: color + '25', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 12 }}>{icon}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '900', color, letterSpacing: 0.4 }}>{isDailyLogNote(note) ? 'DAILY LOG' : 'ENTRY'}</Text>
           </View>
           <Text style={{ fontSize: 11, color: secondaryText, fontWeight: '600' }}>{note.date}</Text>
         </View>
@@ -593,7 +672,7 @@ export default function NotesScreen() {
   };
 
   const renderGridCard = (note: Note) => {
-    const color = getCategoryColor(note.category);
+    const color = accentForNote(note);
     return (
       <TouchableOpacity
         key={note.id}
@@ -609,7 +688,7 @@ export default function NotesScreen() {
           style={StyleSheet.absoluteFill}
         />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-          <Text style={{ fontSize: 11, fontWeight: '800', color, letterSpacing: 0.3 }}>{getCategoryIcon(note.category)} {note.category.toUpperCase()}</Text>
+          <Text style={{ fontSize: 11, fontWeight: '900', color, letterSpacing: 0.3 }}>{iconForNote(note)} {isDailyLogNote(note) ? 'DAILY LOG' : 'ENTRY'}</Text>
           <Text style={{ fontSize: 14 }}>{note.mood}</Text>
         </View>
         <Text style={[s.noteTitle, { fontSize: 15 }]} numberOfLines={2}>{note.isPinned ? '📌 ' : ''}{note.title}</Text>
@@ -620,7 +699,7 @@ export default function NotesScreen() {
   };
 
   const renderCompactCard = (note: Note) => {
-    const color = getCategoryColor(note.category);
+    const color = accentForNote(note);
     return (
       <TouchableOpacity key={note.id} style={s.compactCard} onPress={() => openNote(note)} activeOpacity={0.7}>
         <View style={[s.compactDot, { backgroundColor: color }]} />
@@ -642,11 +721,11 @@ export default function NotesScreen() {
       if (pattern === 0 && i + 1 < noteList.length) {
         // wide + narrow
         const [a, b] = [noteList[i], noteList[i + 1]];
-        const ca = getCategoryColor(a.category), cb = getCategoryColor(b.category);
+        const ca = accentForNote(a), cb = accentForNote(b);
         rows.push(
           <View key={i} style={s.bentoRow}>
             <TouchableOpacity style={[s.bentoCard, { flex: 2, borderTopWidth: 4, borderTopColor: ca, minHeight: 160 }]} onPress={() => openNote(a)} activeOpacity={0.75}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: ca, marginBottom: 6 }}>{getCategoryIcon(a.category)} {a.category.toUpperCase()}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: ca, marginBottom: 6 }}>{iconForNote(a)} {isDailyLogNote(a) ? 'DAILY LOG' : 'ENTRY'}</Text>
               <Text style={s.noteTitle} numberOfLines={2}>{a.isPinned ? '📌 ' : ''}{a.title}</Text>
               <Text style={s.noteSnippet} numberOfLines={3}>{a.content}</Text>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
@@ -655,7 +734,7 @@ export default function NotesScreen() {
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={[s.bentoCard, { flex: 1, borderTopWidth: 4, borderTopColor: cb, minHeight: 160 }]} onPress={() => openNote(b)} activeOpacity={0.75}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: cb, marginBottom: 6 }}>{getCategoryIcon(b.category)}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '800', color: cb, marginBottom: 6 }}>{iconForNote(b)}</Text>
               <Text style={[s.noteTitle, { fontSize: 14 }]} numberOfLines={3}>{b.isPinned ? '📌 ' : ''}{b.title}</Text>
               <Text style={[s.noteSnippet, { fontSize: 12 }]} numberOfLines={3}>{b.content}</Text>
               <Text style={{ fontSize: 10, color: secondaryText, marginTop: 6 }}>{b.date}</Text>
@@ -669,10 +748,10 @@ export default function NotesScreen() {
         rows.push(
           <View key={i} style={s.bentoRow}>
             {trio.map(n => {
-              const c = getCategoryColor(n.category);
+              const c = accentForNote(n);
               return (
                 <TouchableOpacity key={n.id} style={[s.bentoCard, { flex: 1, borderTopWidth: 4, borderTopColor: c, minHeight: 120 }]} onPress={() => openNote(n)} activeOpacity={0.75}>
-                  <Text style={{ fontSize: 10, fontWeight: '800', color: c, marginBottom: 4 }}>{getCategoryIcon(n.category)}</Text>
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: c, marginBottom: 4 }}>{iconForNote(n)}</Text>
                   <Text style={[s.noteTitle, { fontSize: 13 }]} numberOfLines={2}>{n.title}</Text>
                   <Text style={[s.noteSnippet, { fontSize: 11 }]} numberOfLines={2}>{n.content}</Text>
                 </TouchableOpacity>
@@ -684,7 +763,7 @@ export default function NotesScreen() {
       } else {
         // full width accent row
         const n = noteList[i];
-        const c = getCategoryColor(n.category);
+        const c = accentForNote(n);
         rows.push(
           <TouchableOpacity key={n.id} style={[s.bentoCard, { borderLeftWidth: 5, borderLeftColor: c, flexDirection: 'row', alignItems: 'center', gap: 14 }]} onPress={() => openNote(n)} activeOpacity={0.75}>
             <Text style={{ fontSize: 28 }}>{n.mood}</Text>
@@ -776,87 +855,6 @@ export default function NotesScreen() {
   );
 
   // ── Category Manager modal ─────────────────────────────────────────────────
-  const CategoryManager = () => (
-    <Modal visible={isCategoryMgrVisible} transparent animationType="slide">
-      <View style={s.modalOverlay}>
-        <Pressable style={{ flex: 1 }} onPress={() => { setIsCategoryMgrVisible(false); setEditingCategory(null); setNewCatName(''); }} />
-        <SafeAreaView style={[s.modalContent, { maxHeight: '88%' }]}>
-          <Text style={s.modalTitle}>Manage Categories</Text>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            {categories.map(cat => (
-              <View key={cat.name} style={s.catRow}>
-                <View style={[s.catColorDot, { backgroundColor: cat.color }]} />
-                <Text style={{ fontSize: 16, marginRight: 8 }}>{cat.icon}</Text>
-                <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: colors.text }}>{cat.name}</Text>
-                <TouchableOpacity onPress={() => { setEditingCategory(cat); setNewCatName(cat.name); setNewCatIcon(cat.icon); setNewCatColor(cat.color); }} style={{ padding: 8, marginRight: 2 }}>
-                  <Ionicons name="pencil-outline" size={18} color={secondaryText} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => showAlert('Delete Category', `Remove "${cat.name}"? Notes keep their category name.`, [
-                  { text: 'Cancel' },
-                  { text: 'Delete', destructive: true, onPress: () => saveCategories(categories.filter(c => c.name !== cat.name)) },
-                ])} style={{ padding: 8 }}>
-                  <Ionicons name="trash-outline" size={18} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            ))}
-
-            {/* Add / Edit form */}
-            <View style={{ marginTop: 4, backgroundColor: surfaceVariant, borderRadius: 16, padding: 16 }}>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: secondaryText, marginBottom: 12, letterSpacing: 0.5 }}>
-                {editingCategory ? 'EDIT CATEGORY' : 'ADD CATEGORY'}
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                <TextInput
-                  style={{ flex: 1, backgroundColor: cardBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, color: colors.text, fontSize: 15, fontWeight: '600' }}
-                  placeholder="Category name"
-                  placeholderTextColor={placeholderColor}
-                  value={newCatName}
-                  onChangeText={setNewCatName}
-                  maxLength={20}
-                />
-                <TextInput
-                  style={{ width: 52, backgroundColor: cardBg, borderRadius: 10, textAlign: 'center', fontSize: 22, paddingVertical: 8 }}
-                  value={newCatIcon}
-                  onChangeText={t => setNewCatIcon(t.slice(-2))}
-                  maxLength={2}
-                />
-              </View>
-              {/* Colour picker */}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                {PALETTE.map(col => (
-                  <TouchableOpacity key={col} onPress={() => setNewCatColor(col)}
-                    style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: col, borderWidth: newCatColor === col ? 3 : 0, borderColor: colors.text }} />
-                ))}
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {editingCategory && (
-                  <TouchableOpacity style={[s.actionBtn, s.cancelBtn, { flex: 0.6 }]} onPress={() => { setEditingCategory(null); setNewCatName(''); setNewCatIcon('📝'); setNewCatColor(PALETTE[0]); }}>
-                    <Text style={[s.btnText, { color: colors.text, fontSize: 13 }]}>Cancel</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity style={[s.actionBtn, s.saveBtn]} onPress={() => {
-                  if (!newCatName.trim()) return;
-                  if (editingCategory) {
-                    saveCategories(categories.map(c => c.name === editingCategory.name ? { name: newCatName.trim(), icon: newCatIcon, color: newCatColor } : c));
-                    setEditingCategory(null);
-                  } else {
-                    if (categories.find(c => c.name.toLowerCase() === newCatName.trim().toLowerCase())) {
-                      showAlert('Already exists', 'A category with this name already exists.'); return;
-                    }
-                    saveCategories([...categories, { name: newCatName.trim(), icon: newCatIcon, color: newCatColor }]);
-                  }
-                  setNewCatName(''); setNewCatIcon('📝'); setNewCatColor(PALETTE[0]);
-                }}>
-                  <Text style={[s.btnText, { color: '#FFF' }]}>{editingCategory ? 'Save Changes' : 'Add Category'}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
-        </SafeAreaView>
-      </View>
-    </Modal>
-  );
-
   // ── Stats ──────────────────────────────────────────────────────────────────
   const todayStr = formatDate(Date.now());
   const todayCount = notes.filter(n => n.date === todayStr).length;
@@ -920,32 +918,7 @@ export default function NotesScreen() {
           </View>
         </View>
 
-        {/* Category filter chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 12, gap: 8, marginBottom: 12 }}>
-          <TouchableOpacity
-            style={[s.filterChip, selectedCategory === 'All' && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
-            onPress={() => setSelectedCategory('All')}
-          >
-            <Text style={[s.filterChipText, selectedCategory === 'All' && { color: colors.primary }]}>All</Text>
-          </TouchableOpacity>
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat.name}
-              style={[s.filterChip, selectedCategory === cat.name && { borderColor: cat.color, backgroundColor: cat.color + '20' }]}
-              onPress={() => setSelectedCategory(cat.name)}
-            >
-              <Text style={{ fontSize: 13 }}>{cat.icon}</Text>
-              <Text style={[s.filterChipText, selectedCategory === cat.name && { color: cat.color }]}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
-          <TouchableOpacity
-            style={[s.filterChip, { borderStyle: 'dashed', borderColor: outlineColor }]}
-            onPress={() => setIsCategoryMgrVisible(true)}
-          >
-            <Ionicons name="add" size={13} color={secondaryText} />
-            <Text style={s.filterChipText}>Manage</Text>
-          </TouchableOpacity>
-        </ScrollView>
+        {/* Categories removed */}
 
         {/* Date filter + View toggle row */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 }}>
@@ -973,10 +946,10 @@ export default function NotesScreen() {
           <View style={{ alignItems: 'center', marginTop: 60, paddingHorizontal: 40 }}>
             <Text style={{ fontSize: 48 }}>📝</Text>
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, marginTop: 16 }}>
-              {searchQuery || hasDateFilter || selectedCategory !== 'All' ? 'No matches' : 'Start writing'}
+              {searchQuery || hasDateFilter ? 'No matches' : 'Start writing'}
             </Text>
             <Text style={{ fontSize: 14, color: secondaryText, textAlign: 'center', marginTop: 8 }}>
-              {searchQuery || hasDateFilter || selectedCategory !== 'All'
+              {searchQuery || hasDateFilter
                 ? 'Try adjusting your filters.'
                 : 'Tap the + button to create your first entry.'}
             </Text>
@@ -1012,7 +985,7 @@ export default function NotesScreen() {
       {/* FAB */}
       <TouchableOpacity
         style={s.fabMain}
-        onPress={() => { setCurrentNote({ category: categories[0]?.name || 'Personal', mood: '😐' }); setIsEditing(true); }}
+        onPress={() => { setCurrentNote({ mood: '😀', category: 'General', extras: { journalNotes: [] } }); setIsEditing(true); }}
       >
         <Ionicons name="add" size={30} color="#FFF" />
       </TouchableOpacity>
@@ -1044,34 +1017,47 @@ export default function NotesScreen() {
             <ScrollView keyboardShouldPersistTaps="handled">
               {isEditing ? (
                 <>
-                  {/* Mood picker */}
-                  <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginTop: 10, marginBottom: 16 }}>
-                    {MOODS.map(m => (
-                      <TouchableOpacity
-                        key={m}
-                        onPress={() => setCurrentNote({ ...currentNote, mood: m })}
-                        style={[{ width: 46, height: 46, borderRadius: 23, backgroundColor: surfaceVariant, justifyContent: 'center', alignItems: 'center' },
-                        currentNote.mood === m && { backgroundColor: colors.primary + '30', borderWidth: 2, borderColor: colors.primary }]}
-                      >
-                        <Text style={{ fontSize: 22 }}>{m}</Text>
-                      </TouchableOpacity>
-                    ))}
+                  {/* Mood picker + quick time insert */}
+                  <View style={{ paddingHorizontal: 20, marginTop: 10, marginBottom: 16 }}>
+                    <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                      {MOODS.map(m => (
+                        <TouchableOpacity
+                          key={m}
+                          onPress={() => setCurrentNote({ ...currentNote, mood: m })}
+                          style={[{ width: 46, height: 46, borderRadius: 23, backgroundColor: surfaceVariant, justifyContent: 'center', alignItems: 'center' },
+                          currentNote.mood === m && { backgroundColor: colors.primary + '30', borderWidth: 2, borderColor: colors.primary }]}
+                        >
+                          <Text style={{ fontSize: 22 }}>{m}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={insertCurrentTimeAtCursor}
+                      style={{
+                        height: 42,
+                        borderRadius: 16,
+                        backgroundColor: cardBg,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        flexDirection: 'row',
+                        gap: 7,
+                        paddingHorizontal: 13,
+                        borderWidth: 1.5,
+                        borderColor: accentForNote(currentNote) + '55',
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: accentForNote(currentNote) + '20', justifyContent: 'center', alignItems: 'center' }}>
+                        <Ionicons name="time-outline" size={14} color={accentForNote(currentNote)} />
+                      </View>
+                      <Text style={{ color: accentForNote(currentNote), fontWeight: '900', fontSize: 12, letterSpacing: 0.3 }}>
+                        Insert Timestamp
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                  {/* Category picker */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, marginBottom: 16 }}>
-                    {categories.map(c => (
-                      <TouchableOpacity
-                        key={c.name}
-                        style={[s.filterChip, currentNote.category === c.name && { borderColor: c.color, backgroundColor: c.color + '25' }]}
-                        onPress={() => setCurrentNote({ ...currentNote, category: c.name })}
-                      >
-                        <Text style={{ fontSize: 13 }}>{c.icon}</Text>
-                        <Text style={[s.filterChipText, currentNote.category === c.name && { color: c.color }]}>{c.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
                   {/* Color accent bar */}
-                  <View style={{ height: 3, backgroundColor: getCategoryColor(currentNote.category || 'Personal'), marginHorizontal: 20, borderRadius: 2, marginBottom: 16 }} />
+                  <View style={{ height: 3, backgroundColor: accentForNote(currentNote), marginHorizontal: 20, borderRadius: 2, marginBottom: 16 }} />
                   <TextInput
                     style={s.titleInput}
                     placeholder="Title"
@@ -1079,14 +1065,70 @@ export default function NotesScreen() {
                     value={currentNote.title}
                     onChangeText={t => setCurrentNote({ ...currentNote, title: t })}
                   />
-                  <TextInput
-                    style={s.contentInput}
-                    placeholder="Write something meaningful…"
-                    placeholderTextColor={placeholderColor}
-                    multiline
-                    value={currentNote.content}
-                    onChangeText={c => setCurrentNote({ ...currentNote, content: c })}
-                  />
+                  {!isDailyLogNote(currentNote) ? (
+                    <TextInput
+                      style={s.contentInput}
+                      placeholder="Write something meaningful…"
+                      placeholderTextColor={placeholderColor}
+                      multiline
+                      value={currentNote.content}
+                      onChangeText={c => setCurrentNote({ ...currentNote, content: c })}
+                      onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
+                    />
+                  ) : (
+                    <View>
+                      <View style={{ paddingHorizontal: 20, marginTop: 8 }}>
+                        <TextInput
+                          style={s.contentInput}
+                          placeholder="Write your manual notes here..."
+                          placeholderTextColor={placeholderColor}
+                          multiline
+                          value={currentNote.extras?.manualNotes ?? ''}
+                          onChangeText={(t) => setCurrentNote({ ...currentNote, extras: { ...(currentNote.extras ?? {}), manualNotes: t } })}
+                          onSelectionChange={(e) => setManualSelection(e.nativeEvent.selection)}
+                        />
+                      </View>
+
+                      <View style={{ marginHorizontal: 20, marginTop: 8 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '900', color: secondaryText, letterSpacing: 1.1, marginBottom: 8 }}>
+                          AUTO GENERATED LOG
+                        </Text>
+                        <View style={{ borderRadius: 18, overflow: 'hidden', backgroundColor: cardBg, borderWidth: 1, borderColor: outlineColor }}>
+                          <LinearGradient colors={[accentForNote(currentNote) + '18', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                          <View style={{ padding: 14 }}>
+                            {(() => {
+                              const parsed = parseDailyLog(currentNote.content);
+                              const sectionTitle = (label: string, emoji: string) => (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                  <Text style={{ fontSize: 16 }}>{emoji}</Text>
+                                  <Text style={{ fontSize: 13, fontWeight: '900', color: colors.text }}>{label}</Text>
+                                </View>
+                              );
+                              const row = (text: string, key: string) => (
+                                <View key={key} style={{ flexDirection: 'row', gap: 8, paddingVertical: 6 }}>
+                                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: accentForNote(currentNote), marginTop: 8 }} />
+                                  <Text style={{ flex: 1, fontSize: 13, lineHeight: 20, color: colors.text, fontWeight: '600' }}>{text}</Text>
+                                </View>
+                              );
+                              return (
+                                <>
+                                  {sectionTitle('Timesheet', '⏱️')}
+                                  {parsed.timesheet.length > 0
+                                    ? parsed.timesheet.map((s, idx) => row(s.text, `ts-${idx}`))
+                                    : row('No focus sessions logged.', 'ts-empty')}
+                                  <View style={{ height: 10 }} />
+                                  {sectionTitle('Completed', '✅')}
+                                  {parsed.completed.length > 0
+                                    ? parsed.completed.map((s, idx) => row(s.text, `cp-${idx}`))
+                                    : row('Nothing completed yet.', 'cp-empty')}
+                                </>
+                              );
+                            })()}
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  )}
                 </>
               ) : (
                 <View style={{ paddingBottom: 28 }}>
@@ -1094,8 +1136,8 @@ export default function NotesScreen() {
                   <View style={{ paddingHorizontal: 18, paddingTop: 10, paddingBottom: 18 }}>
                     <LinearGradient
                       colors={[
-                        (getCategoryColor(currentNote.category || '') || colors.primary) + '55',
-                        (getCategoryColor(currentNote.category || '') || colors.primary) + '18',
+                        accentForNote(currentNote) + '55',
+                        accentForNote(currentNote) + '18',
                         'transparent',
                       ]}
                       start={{ x: 0, y: 0 }}
@@ -1121,7 +1163,7 @@ export default function NotesScreen() {
                               alignItems: 'center',
                             }}
                           >
-                            <Text style={{ fontSize: 24 }}>{getCategoryIcon(currentNote.category || '')}</Text>
+                            <Text style={{ fontSize: 24 }}>{iconForNote(currentNote)}</Text>
                           </View>
 
                           <View style={{ flex: 1 }}>
@@ -1130,10 +1172,10 @@ export default function NotesScreen() {
                                 fontSize: 11,
                                 fontWeight: '900',
                                 letterSpacing: 1.2,
-                                color: getCategoryColor(currentNote.category || '') || colors.primary,
+                                color: accentForNote(currentNote),
                               }}
                             >
-                              {(currentNote.category || 'Personal').toUpperCase()}
+                              {isDailyLogNote(currentNote) ? 'DAILY LOG' : 'JOURNAL ENTRY'}
                             </Text>
                             <Text style={{ fontSize: 13, color: secondaryText, fontWeight: '700', marginTop: 2 }}>
                               {currentNote.date}
@@ -1164,7 +1206,7 @@ export default function NotesScreen() {
                   {/* Content */}
                   {isDailyLogNote(currentNote) ? (
                     (() => {
-                      const accent = getCategoryColor(currentNote.category || '') || colors.primary;
+                      const accent = accentForNote(currentNote);
                       const parsed = parseDailyLog(currentNote.content);
                       const pill = (label: string, bg: string) => (
                         <View style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 14, backgroundColor: bg, borderWidth: 1, borderColor: outlineColor }}>
@@ -1230,6 +1272,54 @@ export default function NotesScreen() {
 
                       return (
                         <View>
+                          {/* Manual journal notes */}
+                          {!!(parseJournalBlocks(getManualText(currentNote)).length > 0) && (
+                            <View style={{ marginHorizontal: 18, marginTop: 4 }}>
+                              <View style={{ borderRadius: 22, overflow: 'hidden', backgroundColor: cardBg, borderWidth: 1, borderColor: outlineColor }}>
+                                <LinearGradient colors={[accent + '18', 'transparent']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                                <View style={{ padding: 16 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                      <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: accent + '20', justifyContent: 'center', alignItems: 'center' }}>
+                                        <Ionicons name="book-outline" size={14} color={accent} />
+                                      </View>
+                                      <Text style={{ fontSize: 14, fontWeight: '900', color: colors.text }}>Journal Notes</Text>
+                                    </View>
+                                    <View style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: accent + '15', borderWidth: 1, borderColor: accent + '35' }}>
+                                      <Text style={{ fontSize: 10, fontWeight: '900', color: accent, letterSpacing: 0.5 }}>
+                                        {parseJournalBlocks(getManualText(currentNote)).length} ENTRY{parseJournalBlocks(getManualText(currentNote)).length > 1 ? 'IES' : ''}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {parseJournalBlocks(getManualText(currentNote)).map((block, idx) => {
+                                    return (
+                                      <View key={`${idx}-${(block.body || '').slice(0, 12)}`} style={{ backgroundColor: glass, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: outlineColor, marginBottom: 10 }}>
+                                        {!!block.time && (
+                                          <LinearGradient
+                                            colors={[accent + 'BB', accent + '66']}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
+                                            style={{ alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, marginBottom: 9 }}
+                                          >
+                                            <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFF', letterSpacing: 0.5 }}>{block.time}</Text>
+                                          </LinearGradient>
+                                        )}
+                                        <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, lineHeight: 22 }}>
+                                          {block.body}
+                                        </Text>
+                                      </View>
+                                    );
+                                  })}
+                                </View>
+                              </View>
+                            </View>
+                          )}
+
+                          <View style={{ marginHorizontal: 18, marginTop: 12, marginBottom: 2 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '900', letterSpacing: 1.2, color: secondaryText }}>
+                              AUTO GENERATED LOG
+                            </Text>
+                          </View>
                           <SectionCard title="Timesheet" icon="⏱️" tint={accent}>
                             {parsed.timesheet.length === 0 ? (
                               <Row text="No focus sessions logged." tone="muted" />
@@ -1270,16 +1360,81 @@ export default function NotesScreen() {
                       >
                         <LinearGradient
                           colors={[
-                            (getCategoryColor(currentNote.category || '') || colors.primary) + '16',
+                            accentForNote(currentNote) + '16',
                             'transparent',
                           ]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={StyleSheet.absoluteFill}
                         />
-                        <Text style={{ fontSize: 16, color: colors.text, lineHeight: 26, fontWeight: '600' }}>
-                          {currentNote.content}
-                        </Text>
+                        {parseJournalBlocks(getManualText(currentNote)).length > 0 && (
+                          <View style={{ marginBottom: 14 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '900', color: secondaryText, letterSpacing: 1.1, marginBottom: 8 }}>JOURNAL NOTES</Text>
+                            {parseJournalBlocks(getManualText(currentNote)).map((block, idx) => {
+                              return (
+                                <View key={`${idx}-${(block.body || '').slice(0, 12)}`} style={{ backgroundColor: glass, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: outlineColor, marginBottom: 10 }}>
+                                  {!!block.time && (
+                                    <LinearGradient
+                                      colors={[accentForNote(currentNote) + 'BB', accentForNote(currentNote) + '66']}
+                                      start={{ x: 0, y: 0 }}
+                                      end={{ x: 1, y: 0 }}
+                                      style={{ alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, marginBottom: 9 }}
+                                    >
+                                      <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFF', letterSpacing: 0.5 }}>{block.time}</Text>
+                                    </LinearGradient>
+                                  )}
+                                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <View style={{ width: 3, borderRadius: 2, backgroundColor: accentForNote(currentNote) + '99' }} />
+                                    <Text style={{ flex: 1, fontSize: 15, fontWeight: '800', color: colors.text, lineHeight: 22 }}>{block.body}</Text>
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
+                        <View style={{ gap: 10 }}>
+                          {parseJournalBlocks(currentNote.content).map((block, idx) => {
+                            if (!block.time) {
+                              return (
+                                <Text key={`plain-${idx}`} style={{ fontSize: 16, color: colors.text, lineHeight: 26, fontWeight: '600' }}>
+                                  {block.body}
+                                </Text>
+                              );
+                            }
+
+                            return (
+                              <View
+                                key={`ts-${idx}-${(block.body || '').slice(0, 8)}`}
+                                style={{
+                                  backgroundColor: glass,
+                                  borderRadius: 16,
+                                  padding: 14,
+                                  borderWidth: 1,
+                                  borderColor: outlineColor,
+                                }}
+                              >
+                                <LinearGradient
+                                  colors={[accentForNote(currentNote) + 'CC', accentForNote(currentNote) + '77']}
+                                  start={{ x: 0, y: 0 }}
+                                  end={{ x: 1, y: 0 }}
+                                  style={{ alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 5, borderRadius: 999, marginBottom: 9 }}
+                                >
+                                  <Text style={{ fontSize: 11, fontWeight: '900', color: '#FFF', letterSpacing: 0.5 }}>
+                                    {block.time}
+                                  </Text>
+                                </LinearGradient>
+                                {block.body.length > 0 && (
+                                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <View style={{ width: 3, borderRadius: 2, backgroundColor: accentForNote(currentNote) + '99' }} />
+                                    <Text style={{ flex: 1, fontSize: 15, fontWeight: '800', color: colors.text, lineHeight: 22 }}>
+                                      {block.body}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
                       </View>
                     </View>
                   )}
@@ -1320,10 +1475,6 @@ export default function NotesScreen() {
               <Ionicons name="cloud-download-outline" size={22} color={colors.primary} />
               <Text style={s.actionText}>Export Journal (.txt)</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.actionRow} onPress={() => { setIsSettingsVisible(false); setIsCategoryMgrVisible(true); }}>
-              <Ionicons name="color-palette-outline" size={22} color={colors.text} />
-              <Text style={s.actionText}>Manage Categories</Text>
-            </TouchableOpacity>
             <TouchableOpacity style={s.actionRow} onPress={startPinSetup}>
               <Ionicons name="lock-closed-outline" size={22} color={colors.text} />
               <Text style={s.actionText}>{hasRegisteredPin ? 'Reset Security PIN' : 'Set Security PIN'}</Text>
@@ -1346,9 +1497,6 @@ export default function NotesScreen() {
           </SafeAreaView>
         </View>
       </Modal>
-
-      {/* ═══ Category Manager ═══ */}
-      <CategoryManager />
 
       {/* ═══ Custom Alert Modal ═══ */}
       {alertConfig?.visible && (
