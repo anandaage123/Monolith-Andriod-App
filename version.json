@@ -1,11 +1,11 @@
 {
-  "version": "3.3.2",
-  "build": 36,
-  "versionCode": 36,
+  "version": "3.3.3",
+  "build": 37,
+  "versionCode": 37,
   "releaseDate": "2026-04-09",
   "releaseNotes": "\u2022 Bug fixes and improvements",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.3.2/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.3.2",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.3.3/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.3.3",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
