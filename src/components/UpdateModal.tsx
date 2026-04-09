@@ -136,7 +136,7 @@ export default function UpdateModal({ manifest, onDismiss }: UpdateModalProps) {
   const handleUpdate = async () => {
     if (dlState === 'done' && localUri) {
       // APK already downloaded → install it
-      await triggerInstall(localUri, manifest.releaseUrl);
+      await triggerInstall(localUri);
       return;
     }
 
@@ -155,11 +155,10 @@ export default function UpdateModal({ manifest, onDismiss }: UpdateModalProps) {
       setLocalUri(uri);
       setDlState('done');
       // Auto-trigger install immediately
-      await triggerInstall(uri, manifest.releaseUrl);
+      await triggerInstall(uri);
     } else {
       setDlState('error');
-      setDlStatus('Download failed — opening release page');
-      setTimeout(() => Linking.openURL(manifest.releaseUrl), 1500);
+      setDlStatus('Download failed — please try again later');
     }
   };
 

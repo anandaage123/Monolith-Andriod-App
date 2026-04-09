@@ -170,10 +170,10 @@ export async function downloadUpdate(
  */
 export async function triggerInstall(
   localUri: string,
-  releaseUrl: string
+  _releaseUrl?: string
 ): Promise<void> {
   if (Platform.OS !== 'android') {
-    await Linking.openURL(releaseUrl);
+    console.warn('[UpdateService] Update only supported on Android');
     return;
   }
   try {
@@ -187,7 +187,6 @@ export async function triggerInstall(
     });
     return;
   } catch (e) {
-    console.warn('[UpdateService] Intent installation failed, falling back to browser:', e);
+    console.warn('[UpdateService] Intent installation failed:', e);
   }
-  await Linking.openURL(releaseUrl);
 }
