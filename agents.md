@@ -1,58 +1,88 @@
 # Methodic Muse - Agent Master Guide
 
 ## 1. Project Identity & Design System
-**Methodic Muse** is a minimalist, high-focus productivity ecosystem.
-- **Theme:** Dark-mode elegance. High contrast whites on deep slates and purples.
-- **Palette (`MM_Colors`):**
-    - `primary`: `#4052B6` (Royal Muse Blue)
-    - `primaryLight`: `#8899FF`
-    - `background`: `#F9F5FF` (Soft UI background)
-    - `surface`: `#FFFFFF`
-    - `text`: `#2C2A51` (Deep Slate)
-    - `secondary`: `#765600` (Gold)
-    - `tertiary`: `#006947` (Green)
-    - `error`: `#B41340` (Ruby)
+**Methodic Muse** is a premium, high-focus productivity ecosystem built on React Native and Expo, emphasizing minimalist aesthetics and fluid interactions.
 
-## 2. File & Functionality Registry
+- **Theme Engine:** Adaptive system using `ThemeContext`. Supports `light`, `dark`, and `system` preferences persisted via `@app_theme_mode`.
+- **Palette Logic:**
+    - **Light (`MM_Colors`):** Royal Blue (`#4052B6`) primary, Soft Lilac (`#F9F5FF`) background.
+    - **Dark (`Dark_Colors`):** Deep Obsidian (`#0F0E17`) background, High-legibility Blue (`#8899FF`) primary.
+    - **Secondary/Tertiary:** Gold (`#765600`) for emphasis/streaks, Emerald (`#006947`) for success/income.
+- **Typography:** Uses `Inter` font family (fallback to `System` on iOS). Implements a responsive scaling system in `ResponsiveSize.ts` utilizing a 390px base width.
+- **Micro-Animations:** Heavy use of `Animated` API with `useNativeDriver: true`. Entrance sequences use staggered springs (`Animated.stagger`) with `Easing.out(Easing.back(1))`.
 
-### Core
-- `App.tsx`: Entry point with `StatusBar` and `AppNavigator`.
-- `src/navigation/AppNavigator.tsx`: Bottom Tab navigation (Dashboard, Tasks, Wallet, Focus, Journal) and Stack navigation for auth-protected Vault.
-- `src/theme/Theme.ts`: Central source of truth for colors and typography.
+## 2. Technical Architecture
 
-### Features (`src/screens/`)
-- **Dashboard (`DashboardScreen.tsx`)**:
-    - **Rituals:** Persistent habits (`@habits_v3`). Toggle & Long-press delete.
-    - **Quotes:** Fetched from DummyJSON API. Interactive swipe (PanResponder) with spring animations.
-    - **Atmosphere:** GPS weather widget. Uses `expo-location` and Open-Meteo.
-    - **Metrics:** Real-time progress bars for habits and wallet health.
-    - **Vault Entry:** Long-press (2s) on "Daily Hub" logo.
-- **Deep Focus (`FocusScreen.tsx`)**:
-    - **Timer:** Pomodoro engine with custom Work/Break timings.
-    - **Zen Mode:** Pulse animation (scale 1.0 <-> 1.1) synchronized with breathing labels.
-    - **Audio:** `expo-audio` for session completion.
-- **Tasks (`TodosScreen.tsx`)**:
-    - **Ledger:** Priority-based tasking. Long-press to set "Primary Focus".
-    - **Sweep:** Custom confirmation modal to clear tasks.
-- **Curated Journal (`NotesScreen.tsx`)**:
-    - **Security:** 6-digit PIN gate.
-    - **Musings:** Entry creation with mood emojis, category tags, and full-text search.
-    - **Export:** Sharing ledger via system share sheet.
-- **Secure Vault (`VaultScreen.tsx`)**:
-    - **Encryption:** Dual identities (Primary vs Decoy PINs).
-    - **Storage:** Secure media gallery (Images/Videos) and Password Manager.
-    - **Gallery:** Fullscreen native video playback (`expo-video`).
-- **Daily Wallet (`BudgetScreen.tsx`)**:
-    - **History:** Date-grouped `SectionList`.
-    - **Logic:** `Balance = Limit - Expenses + Income`.
-    - **Localization:** Auto-symbol detection via Dashboard location sync.
+### Core Navigation (`src/navigation/`)
+- **`AppNavigator.tsx`**: Uses `@react-navigation/bottom-tabs`. Bottom Tab layout includes Dashboard, Tasks, Budget, Focus, and Journal.
+- **Styling**: Tabs use `tabBarActiveTintColor` tied to context colors and custom `Ionicons` mapping.
 
-## 3. UI/UX Implementation Rules
-- **Scrolling:** ROOT containers must use `flex: 1`. 
-    - Use `contentContainerStyle={{ flexGrow: 1 }}` in `ScrollView` to ensure centering.
-    - **Avoid hardcoded bottom spacers** (e.g., `<View style={{height: 40}}/>`) that cause excessive scroll beyond content.
-    - If content fits exactly (e.g., Auth screens), disable scrolling or use a simple `View`.
-- **Backgrounds:** Ensure root views have proper background colors to prevent black gaps during bounce.
-- **Interactivity:** Quotes are swiped, habits are toggled, focus is set via long-press.
-- **Performance:** Always use `useNativeDriver: true` for `Animated` API calls.
-- **Persistence:** All data goes through `AsyncStorage` with specific namespaced keys.
+### Global State & Persistence
+- **Storage Strategy**: Namespaced `AsyncStorage` keys for reliable data isolation.
+    - `@habits_v3`: Ritual data including id, count, and `lastCompletedDate`.
+    - `@daily_notes_v3`: Journal entries with mood, categories, and full-text content.
+    - `@daily_expenses_v2`: Ledger of financial transactions.
+    - `@budget_limits_v3`: Key-value pairs of `Month-Year` budgets (e.g., `Apr-2026: 15000`).
+
+### Service Layer (`src/services/`)
+- **`DailyLogService.ts`**: The "Central Nervous System."
+    - **Event Interception**: Listens to `recordTodoCompleted`, `recordHabitCompleted`, and `recordFocusSession`.
+    - **Auto-Note Generation**: Upserts a unique note with ID `daily-log-YYYY-MM-DD`.
+    - **Structure**: Formats a raw text content containing `TIMESHEET` and `COMPLETED` sections for the Journal to parse.
+- **`UpdateService.ts`**: OTA (Over-The-Air) pipeline for Android.
+    - **Manifest**: Polls `version.json` from GitHub.
+    - **Logic**: Compares `APP_BUILD` and `APP_VERSION`. Triggers `expo-file-system` to download APK and `expo-intent-launcher` to prompt installation.
+
+## 3. Detailed Feature Specifications
+
+### ◈ Dashboard (`DashboardScreen.tsx`)
+- **Daily Rituals Logic**:
+    - **Reset Engine**: Checked on focus. If `lastCompletedDate` != today, completion is reset. 
+    - **Streak Protection**: If `lastCompletedDate` was yesterday, streak increments on next completion; otherwise, reset to 0.
+- **Atmospheric Intelligence**:
+    - Uses `expo-location` for GPS. Fetches weather data from **Open-Meteo API**.
+    - Reverse geocoding translates coordinates to city names via `Location.reverseGeocodeAsync`.
+- **Interactive Inspiration**:
+    - PanResponder-powered quote card. Left/Right swipe (80px threshold) triggers a spring-animated fetch from `dummyjson.com/quotes`.
+
+### ◈ Deep Focus (`FocusScreen.tsx`)
+- **Pomodoro Engine**:
+    - State-managed countdown with background persistence via `expo-notifications`.
+    - **Continuous Mode**: Optional toggle allows timer to enter "Overtime" (positive count) post-session instead of auto-switching to Break.
+- **Zen Pulse Design**:
+    - Breath-sync animation scaling the container `1.0 <-> 1.1` using `Animated.loop` and `Easing.sin`.
+- **Feedback Loop**: Triggers `ImpactFeedbackStyle.Heavy` and `NotificationFeedbackType.Success` on session end.
+
+### ◈ Tasks & Priority (`TodosScreen.tsx`)
+- **Interactive Registry**:
+    - Uses `react-native-gesture-handler` for `Swipeable` rows (Left: Edit, Right: Archive/Delete).
+    - **The Sweep**: Custom modal that iterates through the list to clear completed tasks with a bulk removal animation.
+- **Smart Scheduling**:
+    - Integrates `expo-notifications` to schedule local push alerts for `dueDate` timestamps.
+    - **Undo Buffer**: Implements a 4.2-second timeout window using `useRef` timers to allow restoring deleted items.
+
+### ◈ Curated Journal (`NotesScreen.tsx`)
+- **Security Logic**:
+    - Custom PIN gate using a 6-digit array. Error state triggers a `translateX` shake sequence.
+- **Bento UI Grid**:
+    - Dynamic layout algorithm. Allocates entries into rows based on a modulo pattern:
+        - `Row 1`: Wide focus + Narrow detail.
+        - `Row 2`: Three equal-width compact nodes.
+        - `Row 3`: Full-width featured accent.
+- **Export Engine**:
+    - Aggregates journal entries into a clean string, saves as a `.txt` file into `FileSystem.cacheDirectory`, and triggers `Sharing.shareAsync`.
+
+### ◈ Daily Wallet (`BudgetScreen.tsx`)
+- **Ledger Logic**:
+    - Implements a `SectionList` grouped by `Date`.
+    - **Budget Analytics**: Calculates real-time health. Percentages exceeding 90% of `currentLimit` trigger color shifts to `MM_Colors.error`.
+- **Month/Year Pivot**: Persistent state for time-traveling through past records with specific month/year budget overrides.
+
+## 4. Engineering Standards & Guardrails
+- **Scroll Performance**: All root containers must use `flex: 1`. `ScrollView` must use `contentContainerStyle={{ flexGrow: 1 }}` to avoid layout clipping.
+- **Haptic Mapping**: 
+    - `Selection/TabSwitch`: `Impact (Light)`
+    - `Success/FormSave`: `Notification (Success)`
+    - `Deletion/Error`: `Notification (Error)` or `Impact (Heavy)`
+- **Native Driver**: Explicit rule: NEVER run layout animations without `useNativeDriver: true` unless animating non-transform properties.
+- **Scalability**: All spacing and font-sizes MUST pass through `scaleSize` or `scaleFontSize` from `ResponsiveSize.ts`—never use hardcoded pixel values.
