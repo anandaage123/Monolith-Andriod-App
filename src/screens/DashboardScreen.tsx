@@ -27,6 +27,7 @@ import { scaleFontSize } from '../utils/ResponsiveSize';
 import { APP_VERSION, APP_BUILD } from '../services/UpdateService';
 import { useTheme } from '../context/ThemeContext';
 import { recordHabitCompleted, removeHabitCompleted } from '../services/DailyLogService';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -389,6 +390,7 @@ export default function DashboardScreen() {
   };
 
   const fetchNewQuote = async (direction: 'left' | 'right' = 'right') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const exitValue = direction === 'right' ? width : -width;
     const entryValue = direction === 'right' ? -width : width;
 
@@ -479,6 +481,7 @@ export default function DashboardScreen() {
   };
 
   const toggleHabit = (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.sequence([
       Animated.timing(habitScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
       Animated.spring(habitScale, { toValue: 1, friction: 5, useNativeDriver: true })
@@ -532,6 +535,7 @@ export default function DashboardScreen() {
   };
 
   const deleteHabit = (id: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Animated.timing(habitDeleteAnim, {
       toValue: 0,
       duration: 300,
@@ -548,6 +552,7 @@ export default function DashboardScreen() {
 
   const addHabit = () => {
     if (newHabitName.trim()) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const newHabit: Habit = {
         id: Date.now().toString(),
         name: newHabitName.trim(),
@@ -602,7 +607,10 @@ export default function DashboardScreen() {
 
               <View style={{ flexDirection: 'row', gap: 12 }}>
                 <Pressable
-                  onPress={() => setThemeMode(isDark ? 'light' : 'dark')}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setThemeMode(isDark ? 'light' : 'dark');
+                  }}
                   style={({ pressed }) => [styles.headerBtn, { opacity: pressed ? 0.7 : 1 }]}
                 >
                   <Ionicons name={isDark ? "sunny" : "moon"} size={22} color={colors.primary} />
@@ -657,6 +665,7 @@ export default function DashboardScreen() {
                     ]}
                     onPress={() => toggleHabit(habit.id)}
                     onLongPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                       setHabitToDelete(habit.id);
                       setDeleteConfirmVisible(true);
                     }}
@@ -679,6 +688,7 @@ export default function DashboardScreen() {
                       </View>
                     </View>
                     <Pressable onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
                       setHabitToDelete(habit.id);
                       setDeleteConfirmVisible(true);
                     }} style={({ pressed }) => [styles.deleteBtn, { opacity: pressed ? 0.7 : 1 }]}>
@@ -694,7 +704,10 @@ export default function DashboardScreen() {
         {renderAnimatedSection(3, (
           <Pressable
             style={({ pressed }) => [styles.weatherCard, { opacity: pressed ? 0.7 : 1 }]}
-            onPress={() => updateWeatherByLocation(true)}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              updateWeatherByLocation(true);
+            }}
           >
             <View style={styles.weatherContent}>
               {isWeatherLoading && !weather ? (
@@ -744,7 +757,10 @@ export default function DashboardScreen() {
             <View style={styles.metricsFooter}>
               <Pressable
                 style={({ pressed }) => [styles.primaryBtn, { opacity: pressed ? 0.7 : 1 }]}
-                onPress={() => navigation.navigate('Focus')}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  navigation.navigate('Focus');
+                }}
               >
                 <Text style={styles.primaryBtnText}>START FOCUS</Text>
               </Pressable>
@@ -762,7 +778,10 @@ export default function DashboardScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.fab, { opacity: pressed ? 0.7 : 1 }]}
-        onPress={() => setIsAddingHabit(true)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setIsAddingHabit(true);
+        }}
       >
         <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.fabInner}>
           <Ionicons name="add" size={32} color="#FFF" />
@@ -797,7 +816,10 @@ export default function DashboardScreen() {
                     selectedIcon.name === icon.name && styles.iconBoxSelected,
                     { opacity: pressed ? 0.7 : 1 }
                   ]}
-                  onPress={() => setSelectedIcon(icon)}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSelectedIcon(icon);
+                  }}
                 >
                   {renderHabitIcon(icon.name, icon.type, selectedIcon.name === icon.name ? colors.white : colors.primary)}
                 </Pressable>

@@ -24,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Typography, Shadows, Spacing } from '../theme/Theme';
 import { scaleFontSize } from '../utils/ResponsiveSize';
 import { useTheme } from '../context/ThemeContext';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -322,6 +323,7 @@ export default function BudgetScreen() {
   const addTransaction = () => {
     const val = parseFloat(amount);
     if (!val || val <= 0) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setAmountError('Please enter a valid amount');
       triggerShake();
       return;
@@ -337,6 +339,7 @@ export default function BudgetScreen() {
     };
 
     saveData([newTx, ...transactions]);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setAmount('');
     setComment('');
     setCategory('Others');
@@ -372,6 +375,7 @@ export default function BudgetScreen() {
   };
 
   const deleteTransaction = (id: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     saveData(transactions.filter(t => t.id !== id));
   };
 
@@ -422,7 +426,10 @@ export default function BudgetScreen() {
           <Text style={styles.title}>History</Text>
           <TouchableOpacity 
             style={styles.filterTrigger}
-            onPress={() => setIsPickerOpen(true)}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setIsPickerOpen(true);
+            }}
           >
             <Text style={styles.filterText}>{selectedMonth} {selectedYear}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.text} />
@@ -458,6 +465,7 @@ export default function BudgetScreen() {
             </View>
             <View style={styles.divider} />
             <TouchableOpacity style={styles.statItem} onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setTempBudgetLimit(Math.floor(currentBudgetLimit).toString());
               setIsSettingsOpen(true);
             }}>
@@ -483,6 +491,7 @@ export default function BudgetScreen() {
           <TouchableOpacity 
             style={styles.transactionCard}
             onLongPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
               showAlert('Delete Entry', 'Remove this transaction?', [
                 { text: 'Cancel' },
                 { text: 'Delete', destructive: true, onPress: () => deleteTransaction(item.id) }
@@ -522,7 +531,10 @@ export default function BudgetScreen() {
           }]
         }
       ]}>
-        <TouchableOpacity style={{flex: 1}} onPress={() => setIsAdding(true)}>
+        <TouchableOpacity style={{flex: 1}} onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setIsAdding(true);
+        }}>
           <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.fabGradient}>
             <Ionicons name="add" size={32} color="#FFF" />
           </LinearGradient>
@@ -544,13 +556,21 @@ export default function BudgetScreen() {
               <View style={styles.typeToggle}>
                  <TouchableOpacity 
                    style={[styles.typeBtn, type === 'expense' && styles.typeBtnActive]} 
-                   onPress={() => { setType('expense'); setCategory(CATEGORIES.expense[0].name); }}
+                   onPress={() => { 
+                     Haptics.selectionAsync();
+                     setType('expense'); 
+                     setCategory(CATEGORIES.expense[0].name); 
+                   }}
                  >
                    <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>Expense</Text>
                  </TouchableOpacity>
                  <TouchableOpacity 
                    style={[styles.typeBtn, type === 'income' && styles.typeBtnActive]} 
-                   onPress={() => { setType('income'); setCategory(CATEGORIES.income[0].name); }}
+                   onPress={() => { 
+                     Haptics.selectionAsync();
+                     setType('income'); 
+                     setCategory(CATEGORIES.income[0].name); 
+                   }}
                  >
                    <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>Income</Text>
                  </TouchableOpacity>
@@ -584,7 +604,10 @@ export default function BudgetScreen() {
                     <TouchableOpacity 
                       key={item.name}
                       style={styles.catItem}
-                      onPress={() => setCategory(item.name)}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setCategory(item.name);
+                      }}
                     >
                       <View style={[styles.catIconBox, category === item.name && { backgroundColor: type === 'expense' ? colors.error : colors.tertiary }]}>
                         <Ionicons name={item.icon as any} size={20} color={category === item.name ? '#FFF' : colors.text} />
@@ -626,7 +649,10 @@ export default function BudgetScreen() {
                     <TouchableOpacity 
                       key={y} 
                       style={[styles.filterTrigger, selectedYear === y && { backgroundColor: colors.primary }]}
-                      onPress={() => setSelectedYear(y)}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setSelectedYear(y);
+                      }}
                     >
                       <Text style={[styles.filterText, selectedYear === y && { color: '#FFF' }]}>{y}</Text>
                     </TouchableOpacity>
@@ -639,7 +665,10 @@ export default function BudgetScreen() {
                     <TouchableOpacity 
                       key={m} 
                       style={[styles.monthCard, selectedMonth === m && { backgroundColor: colors.primary }]}
-                      onPress={() => setSelectedMonth(m)}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setSelectedMonth(m);
+                      }}
                     >
                       <Text style={[styles.filterText, selectedMonth === m && { color: '#FFF' }]}>{m}</Text>
                     </TouchableOpacity>

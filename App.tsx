@@ -17,6 +17,7 @@ import UpdateModal from './src/components/UpdateModal';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { checkForUpdates, VersionManifest } from './src/services/UpdateService';
 import { scaleFontSize } from './src/utils/ResponsiveSize';
+import * as Haptics from 'expo-haptics';
 
 const { width, height } = Dimensions.get('window');
 
@@ -236,6 +237,7 @@ function EnterButton({ onPress, visible }: { onPress: () => void; visible: Anima
     }).start();
 
   const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     ripple.setValue(0);
     rippleOp.setValue(0.5);
     Animated.parallel([
@@ -603,11 +605,13 @@ function EasterEggOverlay({ onClose }: { onClose: () => void }) {
   };
 
   const goNext = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     nextBtnFade.setValue(0);
     setStep((s) => s + 1);
   };
 
   const handleClose = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.timing(masterFade, {
       toValue: 0, duration: 400, useNativeDriver: true,
     }).start(() => onClose());
