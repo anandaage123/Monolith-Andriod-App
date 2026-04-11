@@ -183,7 +183,6 @@ export default function DashboardScreen() {
   const [weather, setWeather] = useState<{ temp: number, desc: string, icon: any, status: string } | null>(null);
   const [isWeatherLoading, setIsWeatherLoading] = useState(false);
   const [quote, setQuote] = useState({ text: "Crafting your morning inspiration...", author: "Daily Hub" });
-  const [budgetHealth, setBudgetHealth] = useState({ label: 'Calculating...', percentage: 0, status: 'Normal' });
 
   // Choreographed Animation Values
   const sectionAnims = useRef([
@@ -287,7 +286,6 @@ export default function DashboardScreen() {
     if (isFocused && isReady) {
       // Check and reset habits daily when screen comes into focus
       checkAndResetHabitsDaily(habits);
-      loadBudgetMetrics();
       if (!weather) updateWeatherByLocation(false);
     }
   }, [isFocused, isReady]);
@@ -308,8 +306,6 @@ export default function DashboardScreen() {
       }
       if (cachedWeather) setWeather(JSON.parse(cachedWeather));
       if (cachedQuote) setQuote(JSON.parse(cachedQuote));
-
-      loadBudgetMetrics();
 
       setTimeout(() => {
         backgroundQuoteUpdate();
@@ -356,28 +352,7 @@ export default function DashboardScreen() {
     } catch (e) { }
   };
 
-  const loadBudgetMetrics = async () => {
-    try {
-      const storedExpenses = await AsyncStorage.getItem('@daily_expenses_v2');
-      const storedLimit = await AsyncStorage.getItem('@budget_limit_v2');
 
-      const expenses = storedExpenses ? JSON.parse(storedExpenses) : [];
-      const limit = storedLimit ? parseFloat(storedLimit) : 10000;
-
-      const totalSpent = expenses.reduce((sum: number, item: any) => item.type === 'expense' ? sum + item.amount : sum, 0);
-      const percentage = Math.min((totalSpent / limit) * 100, 100);
-
-      let status = 'Good';
-      if (percentage > 90) status = 'Critical';
-      else if (percentage > 70) status = 'Warning';
-
-      setBudgetHealth({
-        label: status,
-        percentage: percentage,
-        status: status
-      });
-    } catch (e) { }
-  };
 
   const backgroundQuoteUpdate = async () => {
     try {
@@ -746,13 +721,7 @@ export default function DashboardScreen() {
               <View style={[styles.progressFill, { width: `${completionRate}%`, backgroundColor: colors.primary }]} />
             </View>
 
-            <View style={[styles.metricRow, { marginTop: 20 }]}>
-              <Text style={styles.metricLabel}>Budget Health</Text>
-              <Text style={[styles.metricValue, { color: budgetHealth.status === 'Critical' ? colors.error : (budgetHealth.status === 'Warning' ? colors.secondary : colors.tertiary) }]}>{budgetHealth.label}</Text>
-            </View>
-            <View style={styles.progressBg}>
-              <View style={[styles.progressFill, { width: `${budgetHealth.percentage}%`, backgroundColor: budgetHealth.status === 'Critical' ? colors.error : colors.tertiary }]} />
-            </View>
+
 
             <View style={styles.metricsFooter}>
               <Pressable

@@ -11,7 +11,6 @@ import TodosScreen from '../screens/TodosScreen';
 import NotesScreen from '../screens/NotesScreen';
 import FocusScreen from '../screens/FocusScreen';
 import VaultScreen from '../screens/VaultScreen';
-import BudgetScreen from '../screens/BudgetScreen';
 import PeriodTrackerScreen from '../screens/PeriodTrackerScreen';
 
 const Tab = createBottomTabNavigator();
@@ -37,13 +36,10 @@ function TabNavigator() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: any = 'home';
           let isMCI = false;
-          
           if (route.name === 'Dashboard') {
             iconName = focused ? 'home' : 'home-outline';
           } else if (route.name === 'Tasks') {
             iconName = focused ? 'list' : 'list-outline';
-          } else if (route.name === 'Budget') {
-            iconName = focused ? 'wallet' : 'wallet-outline';
           } else if (route.name === 'Focus') {
             iconName = focused ? 'timer' : 'timer-outline';
           } else if (route.name === 'Journal') {
@@ -67,7 +63,6 @@ function TabNavigator() {
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Tasks" component={TodosScreen} />
-      <Tab.Screen name="Budget" component={BudgetScreen} />
       <Tab.Screen name="Focus" component={FocusScreen} />
       <Tab.Screen name="Journal" component={NotesScreen} />
       {periodTrackerEnabled && (
