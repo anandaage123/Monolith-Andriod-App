@@ -1,11 +1,11 @@
 {
-  "version": "3.5.2",
-  "build": 50,
-  "versionCode": 50,
-  "releaseDate": "2026-04-11",
-  "releaseNotes": "\u2022 Bug fixes and improvements",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.5.2/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.5.2",
+  "version": "3.5.3",
+  "build": 51,
+  "versionCode": 51,
+  "releaseDate": "2026-04-12",
+  "releaseNotes": "\u2022 Improves Focus Screen UI",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.5.3/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.5.3",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
