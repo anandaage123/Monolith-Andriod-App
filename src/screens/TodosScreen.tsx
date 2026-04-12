@@ -143,12 +143,12 @@ interface TodoItemProps {
 const TodoItem = React.memo(({
   item, onToggle, onToggleSubtask, onDelete, onEdit, onArchive, colors, isDark, index, entryAnim,
 }: TodoItemProps) => {
-  const slideIn = entryAnim.interpolate({ inputRange: [0, 1], outputRange: [40 + index * 8, 0] });
+  const slideIn = entryAnim.interpolate({ inputRange: [0, 1], outputRange: [24 + index * 5, 0] });
   const fadeIn = entryAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
 
   if ('isHeader' in item) {
     return (
-      <Animated.View style={[iStyles.headerRow, { opacity: fadeIn, transform: [{ translateX: slideIn }] }]}>
+      <Animated.View style={[iStyles.headerRow, { opacity: fadeIn, transform: [{ translateY: slideIn }] }]}>
         <Text style={[iStyles.headerTxt, { color: colors.textVariant }]}>
           {item.title === 'SHOPPING' ? '🛒 ' : '✦ '}{item.title}
         </Text>
@@ -164,13 +164,18 @@ const TodoItem = React.memo(({
   const sparkAnim = useRef(new Animated.Value(0)).current;
   const swipeRef = useRef<Swipeable>(null);
 
-  // Remove the duplicate definitions if they were already there, but in the previous chunk I moved them up.
-  // We'll just keep the logic clean.
-
   useEffect(() => {
     Animated.spring(checkAnim, {
       toValue: item.completed ? 1 : 0, tension: 80, friction: 6, useNativeDriver: false,
     }).start();
+    if (item.completed) {
+      sparkAnim.setValue(0);
+      Animated.sequence([
+        Animated.timing(sparkAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.delay(600),
+        Animated.timing(sparkAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
   }, [item.completed]);
 
   const handleToggle = () => {
@@ -246,7 +251,7 @@ const TodoItem = React.memo(({
               <View style={[iStyles.priStrip, { backgroundColor: cfg.gradient[0] }]} />
             )}
 
-            <Pressable onPress={handleToggle} hitSlop={16} style={{ marginLeft: (item.completed || isShopping) ? 0 : 4 }}>
+            <Pressable onPress={handleToggle} hitSlop={16} style={{ marginLeft: (item.completed || isShopping) ? 0 : 6 }}>
               <Animated.View style={[
                 iStyles.checkbox,
                 {
@@ -292,7 +297,7 @@ const TodoItem = React.memo(({
               )}
 
               {item.subtasks?.length > 0 && (
-                <View style={[iStyles.badge, { backgroundColor: colors.primary + '15', flexDirection: 'row', width: 'auto', paddingHorizontal: 6, gap: 4, marginTop: isShopping ? 4 : 0 }]}>
+                <View style={[iStyles.badge, { backgroundColor: colors.primary + '15', flexDirection: 'row', paddingHorizontal: 7, paddingVertical: 3, gap: 4, marginTop: isShopping ? 4 : 0, alignSelf: 'flex-start' }]}>
                   <Text style={[iStyles.subtaskCnt, { color: colors.primary }]}>{doneSubtasks}/{item.subtasks.length}</Text>
                   <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={10} color={colors.primary} />
                 </View>
@@ -346,7 +351,7 @@ const TodoItem = React.memo(({
               )}
             </View>
 
-            <Animated.View style={{ opacity: sparkAnim, position: 'absolute', right: 12 }}>
+            <Animated.View style={{ opacity: sparkAnim, position: 'absolute', right: 14, top: 14 }}>
               <Text style={{ fontSize: 17 }}>✨</Text>
             </Animated.View>
           </View>
@@ -357,26 +362,26 @@ const TodoItem = React.memo(({
 });
 
 const iStyles = StyleSheet.create({
-  card: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, paddingLeft: 15, borderRadius: 20, marginBottom: 14, ...Shadows.soft, overflow: 'hidden' },
-  priStrip: { position: 'absolute', left: 0, top: 15, bottom: 15, width: 3.5, borderRadius: 2 },
+  card: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, paddingLeft: 18, borderRadius: 20, marginBottom: 14, ...Shadows.soft, overflow: 'hidden' },
+  priStrip: { position: 'absolute', left: 0, top: 12, bottom: 12, width: 4, borderTopRightRadius: 3, borderBottomRightRadius: 3 },
   checkbox: { width: 22, height: 22, justifyContent: 'center', alignItems: 'center', marginRight: 12, marginTop: 2, borderWidth: 1.5 },
   body: { flex: 1 },
-  text: { fontSize: scaleFontSize(15), fontWeight: '700', lineHeight: 22, marginBottom: 8, letterSpacing: -0.2 },
+  text: { fontSize: scaleFontSize(15), fontWeight: '700', lineHeight: 22, marginBottom: 6, letterSpacing: -0.2 },
   textDone: { textDecorationLine: 'line-through', opacity: 0.45 },
   subtaskRow: { flexDirection: 'row', alignItems: 'center' },
   meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, alignItems: 'center' },
-  priPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7 },
+  priPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
   priTxt: { fontSize: scaleFontSize(9), fontWeight: '800', color: '#FFF', letterSpacing: 0.3 },
-  tagPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 7, borderWidth: 1 },
+  tagPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7, borderWidth: 1 },
   tagTxt: { fontSize: scaleFontSize(9), fontWeight: '700' },
-  duePill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 7 },
+  duePill: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
   dueTxt: { fontSize: scaleFontSize(9), fontWeight: '700' },
-  badge: { width: 17, height: 17, borderRadius: 5, justifyContent: 'center', alignItems: 'center' },
+  badge: { borderRadius: 6, justifyContent: 'center', alignItems: 'center' },
   subtaskCnt: { fontSize: scaleFontSize(8), fontWeight: '800' },
-  subBar: { height: 3, borderRadius: 2, marginTop: 7, overflow: 'hidden' },
+  subBar: { height: 3, borderRadius: 2, marginTop: 9, overflow: 'hidden' },
   subFill: { height: '100%', borderRadius: 2 },
-  swipeRight: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  swipeLeft: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  swipeRight: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  swipeLeft: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   swipeBtn: { justifyContent: 'center', alignItems: 'center', width: 70, alignSelf: 'stretch', borderRadius: 14, gap: 3, marginHorizontal: 3 },
   swipeTxt: { color: '#FFF', fontSize: scaleFontSize(10), fontWeight: '700' },
   headerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 12, paddingHorizontal: 4 },
@@ -428,6 +433,7 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
   const [showPicker, setShowPicker] = useState(false);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subInput, setSubInput] = useState('');
+  const [notes, setNotes] = useState('');
   const slideAnim = useRef(new Animated.Value(600)).current;
   const inputRef = useRef<TextInput>(null);
 
@@ -437,10 +443,12 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
         setText(initial.text); setPriority(initial.priority);
         setSubtasks(initial.subtasks || []);
         setTag(initial.tag);
+        setNotes(initial.notes ?? '');
         setDueDate(initial.dueDate ? new Date(initial.dueDate) : undefined);
       } else {
         setText(''); setPriority('med');
         setTag(initialTag);
+        setNotes('');
         setDueDate(undefined); setSubtasks([]);
       }
       Animated.spring(slideAnim, { toValue: 0, tension: 120, friction: 12, velocity: 1.5, useNativeDriver: true }).start();
@@ -453,6 +461,7 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
     id: initial?.id ?? genId(),
     text: text.trim(), completed: initial?.completed ?? false, archived: initial?.archived ?? false,
     priority, dueDate: dueDate?.getTime(), tag,
+    notes: notes.trim() || undefined,
     subtasks, createdAt: initial?.createdAt ?? Date.now(), completedAt: initial?.completedAt,
   });
 
@@ -503,13 +512,16 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
 
           <View style={mStyles.modeRow}>
             <TouchableOpacity
-              style={[mStyles.modeBtn, { backgroundColor: tag === 'Shopping' ? colors.primary + '15' : colors.background }]}
+              style={[mStyles.modeBtn, {
+                backgroundColor: tag === 'Shopping' ? colors.primary + '15' : colors.background,
+                borderColor: tag === 'Shopping' ? colors.primary + '40' : colors.background,
+              }]}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTag(tag === 'Shopping' ? undefined : 'Shopping'); }}
             >
               <Ionicons name="cart-outline" size={16} color={tag === 'Shopping' ? colors.primary : colors.textVariant} />
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={[mStyles.modeTitle, { color: tag === 'Shopping' ? colors.primary : colors.text }]}>Grocery Mode</Text>
-                <Text style={mStyles.modeSub}>Type your list like a notepad</Text>
+                <Text style={[mStyles.modeSub, { color: colors.textVariant }]}>Type your list like a notepad</Text>
               </View>
               {tag === 'Shopping' && <Ionicons name="checkmark-circle" size={16} color={colors.primary} />}
             </TouchableOpacity>
@@ -550,6 +562,37 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
                     );
                   })}
                 </View>
+
+                {/* Tag */}
+                <Text style={[mStyles.lbl, { color: colors.textVariant }]}>TAG</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+                  {ALL_TAGS.filter(t => t !== 'Shopping').map(t => {
+                    const active = tag === t;
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        onPress={() => { Haptics.selectionAsync(); setTag(active ? undefined : t); }}
+                        style={[mStyles.tagChip, {
+                          backgroundColor: active ? TAG_COLORS[t] + '18' : colors.background,
+                          borderColor: active ? TAG_COLORS[t] : colors.background,
+                        }]}
+                      >
+                        <Text style={[mStyles.tagChipTxt, { color: active ? TAG_COLORS[t] : colors.textVariant }]}>{t}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+
+                {/* Notes */}
+                <Text style={[mStyles.lbl, { color: colors.textVariant }]}>NOTES</Text>
+                <TextInput
+                  style={[mStyles.notesInput, { backgroundColor: colors.background, color: colors.text, marginBottom: 20 }]}
+                  placeholder="Add notes…"
+                  placeholderTextColor={colors.textVariant + '50'}
+                  multiline
+                  value={notes}
+                  onChangeText={setNotes}
+                />
 
                 {/* Due date */}
                 <Text style={[mStyles.lbl, { color: colors.textVariant }]}>DUE DATE</Text>
@@ -600,8 +643,8 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
               </>
             )}
 
-            <TouchableOpacity onPress={() => canSave && handleSaveItems()} activeOpacity={canSave ? 0.85 : 1} style={{ opacity: canSave ? 1 : 0.4, marginTop: tag === 'Shopping' ? 8 : 12 }}>
-              <LinearGradient colors={[colors.primary, colors.primaryLight || colors.primary + 'CC']} style={mStyles.saveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <TouchableOpacity onPress={() => canSave && handleSaveItems()} activeOpacity={canSave ? 0.85 : 1} style={{ opacity: canSave ? 1 : 0.35, marginTop: tag === 'Shopping' ? 8 : 12, marginBottom: 4 }}>
+              <LinearGradient colors={[colors.primary, colors.primaryLight || colors.primary + 'CC']} style={mStyles.saveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                 <Ionicons name={isEdit ? 'checkmark-done-outline' : 'checkmark-circle-outline'} size={19} color="#FFF" style={{ marginRight: 8 }} />
                 <Text style={mStyles.saveTxt}>{isEdit ? 'Save Changes' : (tag === 'Shopping' ? 'Add All Items' : 'Add Task')}</Text>
               </LinearGradient>
@@ -618,10 +661,10 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
 const mStyles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 36, borderTopRightRadius: 36, padding: 22, maxHeight: '93%' },
-  handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#00000018', alignSelf: 'center', marginBottom: 16 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#80808030', alignSelf: 'center', marginBottom: 16 },
   hdr: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   title: { fontSize: scaleFontSize(21), fontWeight: '800' },
-  closeBtn: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  closeBtn: { width: 36, height: 36, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
   input: { borderRadius: 14, padding: 14, fontSize: scaleFontSize(15), fontWeight: '500', marginBottom: 10, minHeight: 48 },
   notesInput: { borderRadius: 14, padding: 14, fontSize: scaleFontSize(13), marginBottom: 18, minHeight: 66, textAlignVertical: 'top' },
   lbl: { fontSize: scaleFontSize(10), fontWeight: '800', letterSpacing: 1.4, marginBottom: 10 },
@@ -647,7 +690,7 @@ const mStyles = StyleSheet.create({
   modeRow: { marginBottom: 18, flexDirection: 'row', gap: 10, alignItems: 'center' },
   modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 16, borderWidth: 1.5, borderColor: 'transparent' },
   modeTitle: { fontSize: scaleFontSize(14), fontWeight: '700' },
-  modeSub: { fontSize: scaleFontSize(10), color: '#5D5A88', marginTop: 1 },
+  modeSub: { fontSize: scaleFontSize(10), marginTop: 1 },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
@@ -692,10 +735,6 @@ export default function TodosScreen() {
       Animated.spring(entryAnim, { toValue: 1, tension: 120, friction: 11, useNativeDriver: true }),
       Animated.spring(fabAnim, { toValue: 1, tension: 150, friction: 9, useNativeDriver: true }),
     ]).start();
-    Animated.loop(Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.033, duration: 1000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(pulseAnim, { toValue: 1, duration: 1000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ])).start();
   }, []);
 
   useEffect(() => { load(); }, []);
@@ -958,7 +997,7 @@ export default function TodosScreen() {
                 {/* Dual Progress */}
                 <Animated.View style={[s.progCard, {
                   backgroundColor: colors.surface,
-                  transform: [{ scale: Animated.multiply(pulseAnim, successAnim) }]
+                  transform: [{ scale: successAnim }],
                 }]}>
                   <LinearGradient colors={isDark ? ['#1A1A2E', '#16213E'] : ['#F8F9FF', '#EEF0FF']} style={s.progInner}>
                     {/* Ritual Progress */}
@@ -1008,7 +1047,7 @@ export default function TodosScreen() {
                 </Animated.View>
 
                 {/* Search */}
-                <View style={[s.searchBar, { backgroundColor: isDark ? colors.surface + '88' : '#FFFFFF', borderBottomWidth: 1, borderBottomColor: colors.primary + '15' }]}>
+                <View style={[s.searchBar, { backgroundColor: isDark ? colors.surface + 'CC' : '#FFFFFF', borderWidth: 1.5, borderColor: colors.primary + '18' }]}>
                   <Ionicons name="search" size={16} color={colors.primary} />
                   <TextInput
                     style={[s.searchInput, { color: colors.text }]}
@@ -1069,19 +1108,19 @@ export default function TodosScreen() {
               <Text style={[s.emptySub, { color: colors.textVariant }]}>No tasks found. Enjoy your focus time or add a new goal.</Text>
             </Animated.View>
           }
-          ListFooterComponent={<View style={{ height: 110 }} />}
+          ListFooterComponent={<View style={{ height: 170 }} />}
         />
 
         {/* Direct Action FABs */}
-        <View style={s.fabBase}>
+        <Animated.View style={[s.fabBase, { transform: [{ scale: fabScale }] }]}>
           <TouchableOpacity
             onPress={() => openAction('Shopping')}
             activeOpacity={0.8}
-            style={[s.fabAlways, { backgroundColor: colors.secondary || '#FFA93A' }]}
+            style={[s.fabAlways, { overflow: 'hidden' }]}
           >
-            <View style={s.fabAlwaysGrad}>
+            <LinearGradient colors={[colors.secondary || '#FFA93A', colors.secondary ? colors.secondary + 'CC' : '#FF8C00']} style={s.fabAlwaysGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
               <Ionicons name="cart-outline" size={26} color="#FFF" />
-            </View>
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1093,7 +1132,7 @@ export default function TodosScreen() {
               <Ionicons name="add" size={30} color="#FFF" />
             </LinearGradient>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
         {/* Toast */}
         {toast && (
@@ -1205,7 +1244,7 @@ const s = StyleSheet.create({
   greeting: { fontSize: scaleFontSize(12), fontWeight: '600', letterSpacing: 0.4, marginBottom: 2 },
   title: { fontSize: scaleFontSize(31), fontWeight: '800', letterSpacing: -0.5 },
   headerBtns: { flexDirection: 'row', gap: 7, marginTop: 3 },
-  hBtn: { width: 36, height: 36, borderRadius: 11, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
+  hBtn: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center', ...Shadows.soft },
 
   progCard: { borderRadius: 20, overflow: 'hidden', marginBottom: 14, ...Shadows.soft },
   progInner: { padding: 17 },
@@ -1213,11 +1252,11 @@ const s = StyleSheet.create({
   progLbl: { fontSize: scaleFontSize(9), fontWeight: '800', letterSpacing: 1.5, marginBottom: 2 },
   progFrac: { fontSize: scaleFontSize(25), fontWeight: '800' },
   progPct: { fontSize: scaleFontSize(21), fontWeight: '800' },
-  progBg: { height: 9, borderRadius: 5, overflow: 'hidden' },
-  progFill: { height: '100%', borderRadius: 5 },
+  progBg: { height: 10, borderRadius: 6, overflow: 'hidden' },
+  progFill: { height: '100%', borderRadius: 6 },
   allDone: { marginTop: 7, fontSize: scaleFontSize(12), fontWeight: '700', textAlign: 'center' },
 
-  searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 13, paddingHorizontal: 12, height: 40, gap: 8, marginBottom: 11, ...Shadows.soft },
+  searchBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, paddingHorizontal: 12, height: 44, gap: 8, marginBottom: 12, ...Shadows.soft },
   searchInput: { flex: 1, fontSize: scaleFontSize(13), fontWeight: '500' },
 
   chip: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 18 },
@@ -1232,11 +1271,11 @@ const s = StyleSheet.create({
   dateSub: { fontSize: scaleFontSize(11), fontWeight: '700', marginTop: 2, letterSpacing: 0.1, opacity: 0.6 },
   progSummary: { fontSize: scaleFontSize(10), fontWeight: '700', marginTop: -4, marginBottom: 10, letterSpacing: 0.2 },
 
-  fabBase: { position: 'absolute', bottom: 34, right: 30, alignItems: 'center', gap: 14 },
-  fabAlways: { width: 56, height: 56, borderRadius: 28, overflow: 'hidden', ...Shadows.strong },
+  fabBase: { position: 'absolute', bottom: 36, right: 28, alignItems: 'center', gap: 12 },
+  fabAlways: { width: 58, height: 58, borderRadius: 29, overflow: 'hidden', ...Shadows.strong },
   fabAlwaysGrad: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  toastWrap: { position: 'absolute', bottom: 96, left: 0, right: 0 },
+  toastWrap: { position: 'absolute', bottom: 160, left: 0, right: 0 },
 
   archOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   archSheet: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 22, maxHeight: '72%' },

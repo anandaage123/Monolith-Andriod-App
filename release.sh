@@ -240,14 +240,20 @@ fi
 
 echo ""
 
-# ─── Step 7: Build & Install to Device ────────────────────────────────────────
-header "Building & Installing"
-info "Running: cd android && ./gradlew installRelease"
-info "By using Gradle directly, we skip slow pre-checks and update the device immediately."
-echo ""
-
-cd android && ./gradlew installRelease
-cd ..
+# ─── Step 7: Build & Install (High Speed) ──────────────────────────────────
+header "Building & Deploying"
+if adb devices 2>/dev/null | grep -v "List of devices" | grep -q "device$"; then
+  info "Device detected! Running: cd android && ./gradlew installRelease"
+  cd android && ./gradlew installRelease
+  cd ..
+  success "Built and installed to device."
+else
+  warn "No device detected via ADB. Falling back to build-only."
+  info "Running: cd android && ./gradlew assembleRelease"
+  cd android && ./gradlew assembleRelease
+  cd ..
+  success "APK built successfully (skipping device install)."
+fi
 
 # Find APK
 APK_SOURCE=$(find android/app/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -n 1)
