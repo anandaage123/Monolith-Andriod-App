@@ -1,7 +1,7 @@
-# Methodic Muse - Agent Master Guide
+# Monolith - Agent Master Guide
 
 ## 1. Project Identity & Design System
-**Methodic Muse** is a premium, high-focus productivity ecosystem built on React Native and Expo, emphasizing minimalist aesthetics and fluid interactions.
+**Monolith** is a premium, high-focus productivity ecosystem built on React Native and Expo, emphasizing minimalist aesthetics and fluid interactions.
 
 - **Theme Engine:** Adaptive system using `ThemeContext`. Supports `light`, `dark`, and `system` preferences persisted via `@app_theme_mode`.
 - **Palette Logic:**
