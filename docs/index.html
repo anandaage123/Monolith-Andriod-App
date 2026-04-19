@@ -5,489 +5,387 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monolith · Remote</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         :root {
-          --bg:        #050507;
-          --surface:   #0c0c10;
-          --surface2:  #13131a;
-          --glass:     rgba(255,255,255,0.03);
-          --border:    rgba(255,255,255,0.07);
-          --border2:   rgba(255,255,255,0.12);
-          --text:      #f2f2f4;
-          --muted:     #72728a;
-          --accent:    #7c6fff;
-          --accent-lo: rgba(124,111,255,0.15);
-          --green:     #4ade80;
-          --red:       #f87171;
-          --yellow:    #fbbf24;
-
-          --font-head: 'Syne', system-ui, sans-serif;
-          --font-body: 'DM Sans', system-ui, sans-serif;
-          --font-mono: 'DM Mono', monospace;
-
-          --sidebar:   260px;
-          --r1:        12px;
-          --r2:        20px;
-          --r3:        28px;
+          --bg: #060608; --surface: #0d0d12; --surface2: #14141c;
+          --glass: rgba(255,255,255,0.03); --border: rgba(255,255,255,0.07);
+          --border2: rgba(255,255,255,0.14); --text: #f0f0f5; --muted: #6b6b85;
+          --accent: #7c6fff; --accent-lo: rgba(124,111,255,0.12);
+          --green: #3ecf8e; --red: #f87171; --yellow: #fbbf24;
+          --fn-head: 'Syne',sans-serif; --fn-body: 'DM Sans',sans-serif; --fn-mono: 'DM Mono',monospace;
+          --sidebar: 250px; --r: 16px; --r2: 24px;
         }
-
-        html { font-size: 15px; font-family: var(--font-body); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+        html { font-size: 15px; font-family: var(--fn-body); color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
         body { overflow-x: hidden; min-height: 100vh; }
+        body::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+          background: radial-gradient(ellipse 70% 50% at 20% 0%, rgba(124,111,255,0.05),transparent),
+                      radial-gradient(ellipse 50% 40% at 80% 100%, rgba(62,207,142,0.04),transparent); }
+        ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:4px}
+        .hidden{display:none!important}
+        button{cursor:pointer;font-family:inherit;border:none;background:transparent}
+        input,textarea,select{font-family:inherit;color:var(--text)}
+        option{background:#111}
 
-        /* Scrollbars */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 4px; }
+        /* ── PAIR SCREEN ── */
+        #pair-screen{height:100vh;display:flex;align-items:center;justify-content:center;
+          background:radial-gradient(ellipse 80% 60% at 50% 40%,rgba(124,111,255,0.08),transparent)}
+        .pair-card{background:rgba(10,10,15,0.92);backdrop-filter:blur(40px);border:1px solid var(--border);
+          border-radius:var(--r2);padding:56px 48px;text-align:center;max-width:460px;width:92%;
+          box-shadow:0 32px 96px rgba(0,0,0,0.7),inset 0 1px rgba(255,255,255,0.06)}
+        .pair-logo{font-family:var(--fn-head);font-size:1.8rem;font-weight:700;letter-spacing:-0.04em;
+          background:linear-gradient(135deg,#fff 40%,#7c6fff);-webkit-background-clip:text;
+          -webkit-text-fill-color:transparent;background-clip:text;margin-bottom:16px}
+        .pair-subtitle{font-size:0.88rem;color:var(--muted);line-height:1.65;margin-bottom:40px}
+        .sync-code-display{font-family:var(--fn-mono);font-size:3rem;font-weight:400;letter-spacing:0.35em;
+          color:#fff;margin:0 0 28px;text-shadow:0 0 32px rgba(124,111,255,0.5)}
+        .pair-hint{display:flex;align-items:center;justify-content:center;gap:10px;font-size:0.84rem;
+          color:var(--muted);margin-bottom:28px}
+        .pulse-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;
+          animation:pulseAnim 2s ease infinite}
+        @keyframes pulseAnim{0%,100%{opacity:.4;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+        .demo-btn{background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid var(--border);
+          padding:11px 28px;border-radius:100px;font-size:0.875rem;font-weight:500;transition:all .2s}
+        .demo-btn:hover{background:rgba(255,255,255,0.1);color:var(--text)}
 
-        /* Ambient glow */
-        body::before {
-          content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
-          background:
-            radial-gradient(ellipse 60% 40% at 10% 10%, rgba(124,111,255,0.06), transparent),
-            radial-gradient(ellipse 40% 30% at 90% 90%, rgba(74,222,128,0.04), transparent);
-        }
+        /* ── APP SHELL ── */
+        #app{display:flex;min-height:100vh}
+        .sidebar{width:var(--sidebar);height:100vh;position:sticky;top:0;flex-shrink:0;
+          background:rgba(6,6,8,0.75);backdrop-filter:blur(24px);border-right:1px solid var(--border);
+          display:flex;flex-direction:column;padding:28px 14px;gap:2px;overflow-y:auto}
+        .sidebar-brand{font-family:var(--fn-head);font-size:1.2rem;font-weight:700;letter-spacing:-0.04em;
+          color:#fff;padding:8px 16px;margin-bottom:24px;display:flex;align-items:center;gap:10px}
+        .sidebar-brand::before{content:'';flex-shrink:0;width:18px;height:18px;border-radius:5px;
+          background:linear-gradient(135deg,var(--accent),#b4a0ff);box-shadow:0 4px 12px rgba(124,111,255,0.35)}
+        .nav-btn{display:flex;align-items:center;gap:12px;width:100%;padding:10px 16px;border-radius:12px;
+          color:var(--muted);font-size:0.9rem;font-weight:500;transition:all .18s;position:relative;text-align:left}
+        .nav-btn:hover{background:var(--glass);color:var(--text)}
+        .nav-btn.active{background:rgba(255,255,255,0.07);color:var(--text)}
+        .nav-btn.active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;
+          width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+        .nav-icon{width:17px;height:17px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2}
+        .sidebar-spacer{flex:1;min-height:16px}
+        .sidebar-bottom{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.02);
+          border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+        .connection-pill{display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text);font-weight:500}
+        .conn-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px rgba(62,207,142,0.5)}
+        .unlink-btn{font-size:0.78rem;color:var(--muted);padding:4px 8px;border-radius:6px;transition:all .18s}
+        .unlink-btn:hover{color:var(--red);background:rgba(248,113,113,0.08)}
 
-        /* ── UTILITIES ───────────────────────────────────────────────────── */
-        .hidden { display: none !important; }
-        button { cursor: pointer; font-family: inherit; border: none; background: transparent; }
-        input, textarea, select { font-family: inherit; color: var(--text); }
+        /* ── MAIN ── */
+        .main{flex:1;min-height:100vh;padding:52px 60px;overflow-x:hidden}
+        .view{display:none}
+        .view.active{display:block;animation:viewIn .35s cubic-bezier(.16,1,.3,1)}
+        @keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
-        /* ── PAIR SCREEN ─────────────────────────────────────────────────── */
-        #pair-screen {
-          height: 100vh; display: flex; align-items: center; justify-content: center;
-          background: radial-gradient(ellipse 80% 60% at 50% 50%, rgba(124,111,255,0.07), transparent);
-        }
-        .pair-card {
-          background: rgba(12,12,16,0.9); backdrop-filter: blur(40px);
-          border: 1px solid var(--border); border-radius: var(--r3);
-          padding: 56px 48px; text-align: center; max-width: 460px; width: 92%;
-          box-shadow: 0 32px 96px rgba(0,0,0,0.6), inset 0 1px rgba(255,255,255,0.06);
-        }
-        .pair-logo {
-          font-family: var(--font-head); font-size: 1.8rem; font-weight: 700; letter-spacing: -0.04em;
-          background: linear-gradient(135deg, #fff 40%, #7c6fff); -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 16px;
-        }
-        .pair-subtitle { font-size: 0.9rem; color: var(--muted); line-height: 1.6; margin-bottom: 40px; }
-        .sync-code-display {
-          font-family: var(--font-mono); font-size: 3.2rem; font-weight: 400;
-          letter-spacing: 0.35em; color: #fff; margin: 0 0 32px;
-          text-shadow: 0 0 32px rgba(124,111,255,0.5);
-        }
-        .pair-hint { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 0.85rem; color: var(--muted); margin-bottom: 28px; }
-        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulseAnim 2s ease infinite; flex-shrink: 0; }
-        @keyframes pulseAnim { 0%,100%{opacity:0.4;transform:scale(0.8)} 50%{opacity:1;transform:scale(1.15)} }
-        .demo-btn {
-          background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border);
-          padding: 12px 28px; border-radius: 100px; font-size: 0.875rem; font-weight: 500; transition: all 0.2s;
-        }
-        .demo-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+        /* ── PAGE HEADERS ── */
+        .page-header{margin-bottom:40px}
+        .page-title{font-family:var(--fn-head);font-size:2.2rem;font-weight:700;letter-spacing:-0.04em;color:#fff;margin-bottom:6px}
+        .page-sub{font-size:0.875rem;color:var(--muted)}
 
-        /* ── APP SHELL ───────────────────────────────────────────────────── */
-        #app { display: flex; min-height: 100vh; }
+        /* ── DASHBOARD ── */
+        .dash-layout{display:grid;grid-template-columns:1fr 320px;gap:40px;align-items:start}
+        @media(max-width:1100px){.dash-layout{grid-template-columns:1fr}}
 
-        /* ── SIDEBAR ─────────────────────────────────────────────────────── */
-        .sidebar {
-          width: var(--sidebar); height: 100vh; position: sticky; top: 0; flex-shrink: 0;
-          background: rgba(8,8,12,0.7); backdrop-filter: blur(24px);
-          border-right: 1px solid var(--border);
-          display: flex; flex-direction: column; padding: 32px 16px; gap: 4px;
-          overflow-y: auto;
-        }
-        .sidebar-brand {
-          font-family: var(--font-head); font-size: 1.25rem; font-weight: 700;
-          letter-spacing: -0.04em; color: #fff; padding: 8px 16px; margin-bottom: 28px;
-          display: flex; align-items: center; gap: 10px;
-        }
-        .sidebar-brand::before {
-          content: '';flex-shrink:0; width: 20px; height: 20px; border-radius: 6px;
-          background: linear-gradient(135deg, var(--accent) 0%, #b4a0ff 100%);
-          box-shadow: 0 4px 12px rgba(124,111,255,0.4);
-        }
-        .nav-btn {
-          display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 16px;
-          border-radius: var(--r1); color: var(--muted); font-size: 0.925rem; font-weight: 500;
-          transition: all 0.18s; position: relative; text-align: left;
-        }
-        .nav-btn:hover { background: var(--glass); color: var(--text); }
-        .nav-btn.active { background: rgba(255,255,255,0.07); color: var(--text); }
-        .nav-btn.active::before {
-          content: ''; position: absolute; left: 0; top: 8px; bottom: 8px;
-          width: 3px; border-radius: 0 3px 3px 0; background: var(--accent);
-        }
-        .nav-icon { width: 18px; height: 18px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 2; }
-        .sidebar-spacer { flex: 1; min-height: 24px; }
-        .sidebar-bottom {
-          padding: 14px 16px; border-radius: var(--r1);
-          background: rgba(255,255,255,0.02); border: 1px solid var(--border);
-          display: flex; justify-content: space-between; align-items: center;
-        }
-        .connection-pill { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--text); font-weight: 500; }
-        .conn-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(74,222,128,0.5); }
-        .unlink-btn { font-size: 0.8rem; color: var(--muted); transition: color 0.2s; padding: 4px 8px; border-radius: 6px; }
-        .unlink-btn:hover { color: var(--red); background: rgba(248,113,113,0.08); }
+        /* Stats row */
+        .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+        .stat-card{background:rgba(14,14,20,0.8);backdrop-filter:blur(20px);border:1px solid var(--border);
+          border-top-color:rgba(255,255,255,0.1);border-radius:var(--r);padding:24px;position:relative;overflow:hidden}
+        .stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:80px;
+          background:radial-gradient(ellipse at 50% -20%,var(--glow,rgba(124,111,255,0.12)),transparent 70%);pointer-events:none}
+        .stat-label{font-size:0.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+        .stat-value{font-family:var(--fn-mono);font-size:2.8rem;font-weight:400;letter-spacing:-0.04em;color:#fff;line-height:1;margin-bottom:6px}
+        .stat-sub{font-size:0.78rem;color:var(--muted)}
 
-        /* ── MAIN CONTENT ────────────────────────────────────────────────── */
-        .main { flex: 1; min-height: 100vh; padding: 56px 64px; overflow-x: hidden; }
-
-        /* ── VIEWS (critical fix) ────────────────────────────────────────── */
-        .view { display: none; }
-        .view.active { display: block; animation: viewIn 0.35s cubic-bezier(0.16,1,0.3,1); }
-        @keyframes viewIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
-
-        /* ── PAGE HEADERS ────────────────────────────────────────────────── */
-        .page-header { margin-bottom: 48px; }
-        .page-title { font-family: var(--font-head); font-size: 2.4rem; font-weight: 700; letter-spacing: -0.04em; color: #fff; margin-bottom: 8px; }
-        .page-sub { font-size: 0.9rem; color: var(--muted); }
-
-        /* ── CARDS ───────────────────────────────────────────────────────── */
-        .card {
-          background: linear-gradient(160deg, rgba(20,20,28,0.8), rgba(12,12,16,0.8));
-          backdrop-filter: blur(20px);
-          border: 1px solid var(--border);
-          border-top-color: rgba(255,255,255,0.1);
-          border-radius: var(--r2); padding: 28px;
-          position: relative; overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-          transition: transform 0.25s, box-shadow 0.25s;
-        }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(0,0,0,0.45); }
-        .card-glow::after {
-          content:''; position:absolute; top:0; left:0; right:0; height:120px;
-          background: radial-gradient(ellipse at 50% 0%, var(--accent-lo), transparent 70%);
-          pointer-events: none;
-        }
-        .card-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
-        .card-value { font-family: var(--font-mono); font-size: 3.6rem; font-weight: 400; letter-spacing: -0.04em; color: #fff; line-height: 1; }
-
-        /* ── DASHBOARD LAYOUT ────────────────────────────────────────────── */
-        .dashboard-desktop-layout { display: grid; grid-template-columns: 1fr; gap: 32px; }
-        .bento-3 { display: grid; grid-template-columns: 1fr; gap: 20px; }
-        @media (min-width: 900px) {
-          .bento-3 { grid-template-columns: 2fr 1fr 1fr; }
-        }
-        @media (min-width: 1280px) {
-          .dashboard-desktop-layout { grid-template-columns: 2.2fr 1fr; gap: 40px; }
-        }
-        .greeting-card { display: flex; flex-direction: column; }
-        .greeting-sub { font-size: 1.05rem; font-weight: 500; color: #ddd; margin-bottom: 20px; }
-        .weather-row {
-          display: flex; align-items: center; gap: 14px;
-          background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.06);
-          border-radius: var(--r1); padding: 12px 16px; margin-top: auto;
-        }
-        .weather-icon { font-size: 1.8rem; }
-        .weather-temp { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 400; color: #fff; }
-        .weather-desc { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
-        .hourly-graph { margin-top: 16px; }
-        .hourly-labels { display: flex; font-size: 0.7rem; color: var(--muted); padding: 4px 0; }
-
-        /* Completion Ring */
-        .completion-ring-wrap { position: relative; width: 64px; height: 64px; flex-shrink: 0; }
-        .timer-ring-bg { stroke: rgba(255,255,255,0.06); }
-        .completion-ring-label { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-        .ring-pct { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500; color: #fff; }
+        /* Weather card */
+        .weather-card{background:rgba(14,14,20,0.8);backdrop-filter:blur(20px);border:1px solid var(--border);
+          border-top-color:rgba(255,255,255,0.1);border-radius:var(--r);padding:24px;margin-bottom:24px}
+        .weather-main{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+        .weather-emoji{font-size:2.5rem;line-height:1}
+        .weather-temp{font-family:var(--fn-mono);font-size:2rem;font-weight:400;color:#fff}
+        .weather-desc{font-size:0.82rem;color:var(--muted);margin-top:3px}
+        .weather-wind{font-size:0.78rem;color:var(--muted);margin-left:auto}
+        .hourly-graph{margin-top:8px}
+        .hourly-labels{display:flex;font-size:0.68rem;color:var(--muted);padding:4px 0}
 
         /* Quote */
-        .quote-card { padding: 40px 48px; text-align: center; }
-        .quote-text { font-size: 1.15rem; font-style: italic; color: #ddd; line-height: 1.6; margin-bottom: 14px; }
-        .quote-author { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.02em; }
+        .quote-card{background:rgba(14,14,20,0.6);border:1px solid var(--border);border-radius:var(--r);
+          padding:32px 40px;text-align:center}
+        .quote-text{font-size:1.1rem;font-style:italic;color:#ddd;line-height:1.65;margin-bottom:12px}
+        .quote-author{font-size:0.8rem;color:var(--muted)}
 
-        /* ── RITUALS ─────────────────────────────────────────────────────── */
-        .rituals-section { }
-        .section-head { margin-bottom: 20px; }
-        .section-title { font-family: var(--font-head); font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
-        .rituals-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        @media (min-width: 600px) { .rituals-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
+        /* Motivation banner */
+        .motivation-bar{display:flex;align-items:center;gap:12px;padding:14px 20px;
+          background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:12px;margin-bottom:24px}
+        .motivation-text{font-size:0.9rem;font-weight:500;color:var(--text)}
 
-        .ritual-card {
-          background: rgba(255,255,255,0.02); border: 1px solid var(--border);
-          border-radius: var(--r1); padding: 16px 18px;
-          display: flex; align-items: center; justify-content: space-between; gap: 12px;
-          transition: all 0.2s; cursor: pointer;
+        /* Rituals panel */
+        .rituals-panel{background:rgba(14,14,20,0.7);backdrop-filter:blur(20px);border:1px solid var(--border);
+          border-top-color:rgba(255,255,255,0.1);border-radius:var(--r2);padding:0;overflow:hidden;position:sticky;top:24px}
+        .rituals-panel-head{padding:20px 24px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+        .rituals-panel-title{font-family:var(--fn-head);font-size:1rem;font-weight:700;color:#fff}
+        .rituals-progress-wrap{display:flex;align-items:center;gap:10px}
+        .rituals-pct-text{font-family:var(--fn-mono);font-size:0.85rem;color:var(--accent);font-weight:500}
+        .rituals-list{padding:8px 12px 12px}
+
+        .ritual-item{display:flex;align-items:center;gap:14px;padding:12px;border-radius:12px;
+          cursor:pointer;transition:all .18s;position:relative}
+        .ritual-item:hover{background:rgba(255,255,255,0.04)}
+        .ritual-item.completed{opacity:.75}
+        .ritual-item.completed .ritual-item-name{text-decoration:line-through;color:var(--muted)}
+        .ritual-item-icon{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,0.05);
+          display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+        .ritual-item.completed .ritual-item-icon{background:rgba(62,207,142,0.1)}
+        .ritual-item-body{flex:1;min-width:0}
+        .ritual-item-name{font-size:0.9rem;font-weight:500;color:var(--text);
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ritual-item-meta{font-size:0.75rem;color:var(--muted);margin-top:2px}
+        .ritual-check-btn{width:26px;height:26px;border-radius:50%;border:2px solid var(--border2);
+          display:flex;align-items:center;justify-content:center;font-size:0.75rem;
+          transition:all .2s;flex-shrink:0;color:#000}
+        .ritual-item.completed .ritual-check-btn{background:var(--green);border-color:var(--green);
+          box-shadow:0 0 12px rgba(62,207,142,0.35);color:#000}
+        .ritual-add-row{padding:8px 12px 16px}
+        .ritual-add-btn{width:100%;padding:10px;border-radius:10px;border:1px dashed rgba(255,255,255,0.1);
+          color:var(--muted);font-size:0.875rem;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
+        .ritual-add-btn:hover{border-color:rgba(255,255,255,0.25);color:var(--text);background:rgba(255,255,255,0.03)}
+        .ritual-progress-bar{height:3px;background:rgba(255,255,255,0.05);margin:0 12px 0}
+        .ritual-progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .6s ease}
+
+        /* ── TASKS ── */
+        .task-add-bar{display:flex;gap:10px;align-items:center;background:rgba(10,10,15,0.9);
+          backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:100px;
+          padding:8px 8px 8px 22px;margin-bottom:28px;box-shadow:0 8px 24px rgba(0,0,0,0.2)}
+        .task-input{flex:1;background:transparent;border:none;font-size:0.95rem;color:var(--text);outline:none;min-width:0}
+        .task-input::placeholder{color:var(--muted)}
+        .priority-select{background:transparent;border:none;color:var(--muted);font-size:0.85rem;outline:none;cursor:pointer;padding:0 4px}
+        .priority-select:hover{color:var(--text)}
+        .add-btn{background:#fff;color:#000;font-weight:700;font-size:0.85rem;padding:10px 22px;border-radius:100px;transition:all .18s;flex-shrink:0}
+        .add-btn:hover{transform:scale(1.04)}
+
+        .task-filters{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+        .filter-btn{padding:7px 16px;border-radius:100px;font-size:0.82rem;font-weight:500;
+          color:var(--muted);border:1px solid transparent;transition:all .18s}
+        .filter-btn:hover{color:var(--text);background:var(--glass)}
+        .filter-btn.active{color:var(--text);background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.06)}
+
+        .task-list{display:grid;grid-template-columns:1fr;gap:10px}
+        @media(min-width:1100px){.task-list{grid-template-columns:1fr 1fr;gap:12px}}
+
+        .task-item{background:rgba(12,12,18,0.8);backdrop-filter:blur(10px);border:1px solid var(--border);
+          border-radius:var(--r);padding:16px 18px;display:flex;align-items:flex-start;gap:14px;transition:all .2s}
+        .task-item:hover{background:rgba(255,255,255,0.03);border-color:var(--border2);transform:translateY(-1px)}
+        .task-item.completed{opacity:.45}
+        .task-check{width:20px;height:20px;border-radius:6px;border:2px solid var(--border2);display:flex;
+          align-items:center;justify-content:center;cursor:pointer;transition:all .18s;flex-shrink:0;margin-top:1px;font-size:0.7rem}
+        .task-item.completed .task-check{background:var(--accent);border-color:var(--accent);color:#fff}
+        .task-content{flex:1;min-width:0}
+        .task-text{font-size:0.9rem;color:var(--text);line-height:1.4}
+        .task-item.completed .task-text{text-decoration:line-through;color:var(--muted)}
+        .task-meta{display:flex;gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap}
+        .task-badge{padding:2px 8px;border-radius:4px;font-size:0.7rem;font-weight:700;letter-spacing:.03em}
+        .badge-high{background:rgba(248,113,113,0.12);color:#f87171}
+        .badge-med{background:rgba(251,191,36,0.1);color:#fbbf24}
+        .badge-low{background:rgba(62,207,142,0.1);color:#3ecf8e}
+        .task-actions{display:flex;gap:6px;opacity:0;transition:opacity .18s;flex-shrink:0}
+        .task-item:hover .task-actions{opacity:1}
+        .task-action-btn{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:0.85rem;transition:all .18s}
+        .task-edit-btn{background:rgba(255,255,255,0.05);color:var(--muted)}
+        .task-edit-btn:hover{background:rgba(255,255,255,0.1);color:var(--text)}
+        .task-del-btn{background:rgba(248,113,113,0.07);color:var(--red)}
+        .task-del-btn:hover{background:rgba(248,113,113,0.18)}
+        .task-empty{padding:40px 24px;text-align:center;color:var(--muted);font-size:0.9rem;
+          background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:var(--r);grid-column:1/-1}
+
+        /* ── FOCUS TIMER ── */
+        .focus-layout{display:grid;grid-template-columns:1fr;gap:28px}
+        @media(min-width:1100px){.focus-layout{grid-template-columns:1fr 340px}}
+        .timer-card{background:rgba(14,14,20,0.8);border:1px solid var(--border);
+          border-top-color:rgba(255,255,255,0.1);border-radius:var(--r2);padding:48px 40px;
+          display:flex;flex-direction:column;align-items:center;text-align:center;gap:28px}
+        .mode-pills{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;
+          background:rgba(0,0,0,0.45);padding:5px;border-radius:100px;border:1px solid var(--border)}
+        .mode-pill{padding:8px 18px;border-radius:100px;font-size:0.8rem;font-weight:500;color:var(--muted);transition:all .2s}
+        .mode-pill:hover{color:var(--text)}
+        .mode-pill.active{background:rgba(255,255,255,0.12);color:var(--text)}
+        .timer-ring-wrap{position:relative;width:240px;height:240px;display:flex;align-items:center;justify-content:center}
+        .timer-ring-svg{position:absolute;top:0;left:0;transform:rotate(-90deg)}
+        .timer-ring-bg{stroke:rgba(255,255,255,0.06)}
+        .timer-ring-fg{transition:stroke-dashoffset .5s ease}
+        .timer-display{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+        .timer-time{font-family:var(--fn-mono);font-size:3.6rem;font-weight:300;letter-spacing:-0.02em;color:#fff;line-height:1}
+        .timer-phase{font-size:0.65rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-top:8px}
+        .sprint-dots{display:flex;gap:6px;align-items:center}
+        .sprint-dot{width:8px;height:8px;border-radius:50%;background:var(--border2);transition:all .3s}
+        .sprint-dot.done{background:var(--accent)}
+        .timer-controls{display:flex;align-items:center;gap:18px}
+        .ctrl-btn{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.06);
+          color:var(--text);font-size:1rem;display:flex;align-items:center;justify-content:center;
+          transition:all .2s;border:1px solid var(--border)}
+        .ctrl-btn:hover{background:rgba(255,255,255,0.12);transform:scale(1.05)}
+        .ctrl-btn-main{width:68px;height:68px;border-radius:50%;background:#fff;color:#000;font-size:1.3rem;
+          display:flex;align-items:center;justify-content:center;transition:all .2s;box-shadow:0 8px 24px rgba(255,255,255,0.15)}
+        .ctrl-btn-main:hover{transform:scale(1.06);box-shadow:0 12px 32px rgba(255,255,255,0.22)}
+
+        .focus-sidebar-card{background:rgba(12,12,18,0.8);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:12px}
+        .focus-sidebar-label{font-size:0.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+        .session-input{width:100%;background:rgba(0,0,0,0.35);border:1px solid var(--border);padding:10px 14px;border-radius:10px;color:var(--text);font-size:0.9rem;outline:none;transition:border-color .2s}
+        .session-input:focus{border-color:var(--accent)}
+        .tag-grid{display:flex;flex-wrap:wrap;gap:6px}
+        .tag-btn{padding:5px 12px;border-radius:100px;border:1px solid var(--border);font-size:0.78rem;color:var(--muted);transition:all .18s}
+        .tag-btn:hover{color:var(--text);border-color:var(--border2)}
+        .tag-btn.active{background:var(--accent-lo);color:var(--accent);border-color:var(--accent)}
+        .zen-duration-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+        .zen-dur-btn{padding:8px 4px;border-radius:8px;border:1px solid var(--border);font-size:0.78rem;color:var(--muted);text-align:center;transition:all .18s}
+        .zen-dur-btn.active{border-color:var(--green);color:var(--green);background:rgba(62,207,142,0.08)}
+        .custom-time-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+        .time-stepper{display:flex;align-items:center;gap:6px}
+        .stepper-btn{width:26px;height:26px;border-radius:7px;background:rgba(255,255,255,0.06);color:var(--text);display:flex;align-items:center;justify-content:center;font-size:0.95rem;transition:all .18s}
+        .stepper-btn:hover{background:rgba(255,255,255,0.12)}
+        .stepper-val{font-family:var(--fn-mono);font-size:0.9rem;min-width:26px;text-align:center;color:var(--text)}
+        .preset-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+        .preset-pill{padding:4px 10px;border-radius:100px;border:1px solid var(--border);font-size:0.72rem;color:var(--muted);transition:all .18s}
+        .preset-pill:hover{color:var(--text);border-color:var(--border2)}
+        .preset-pill.active{color:var(--accent);border-color:var(--accent);background:var(--accent-lo)}
+        .sprint-count-row{display:flex;gap:6px;flex-wrap:wrap}
+        .sprint-count-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);font-size:0.85rem;color:var(--muted);display:flex;align-items:center;justify-content:center;transition:all .18s}
+        .sprint-count-btn:hover{color:var(--text);border-color:var(--border2)}
+        .sprint-count-btn.active{color:var(--accent);border-color:var(--accent);background:var(--accent-lo)}
+        .session-log-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+        .session-log-item:last-child{border-bottom:none}
+        .log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+        .log-name{flex:1;font-size:0.83rem;color:var(--text)}
+        .log-meta{font-size:0.73rem;color:var(--muted);text-align:right}
+        .log-empty{font-size:0.82rem;color:var(--muted);padding:6px 0}
+        .linked-task-display{background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;margin-top:6px}
+        .linked-task-label{font-size:0.82rem;flex:1;color:var(--text)}
+        .linked-task-clear{font-size:0.75rem;color:var(--red)}
+        .available-task-item{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;cursor:pointer;font-size:0.82rem;color:var(--muted);transition:all .18s}
+        .available-task-item:hover{background:var(--glass);color:var(--text)}
+
+        /* ── JOURNAL ── */
+        .journal-layout{display:grid;grid-template-columns:1fr;gap:28px}
+        @media(min-width:1100px){.journal-layout{grid-template-columns:360px 1fr;align-items:start}}
+        .note-compose{background:rgba(12,12,18,0.9);backdrop-filter:blur(20px);border:1px solid var(--border);
+          border-top-color:rgba(255,255,255,0.1);border-radius:var(--r2);padding:24px;position:sticky;top:24px}
+        .note-title-input{width:100%;background:transparent;border:none;font-size:1.1rem;font-weight:600;
+          color:var(--text);outline:none;margin-bottom:14px}
+        .note-title-input::placeholder{color:var(--muted)}
+        .note-content-input{width:100%;background:transparent;border:none;font-size:0.9rem;color:#ccc;
+          line-height:1.65;outline:none;resize:none;margin-bottom:20px}
+        .note-content-input::placeholder{color:var(--muted)}
+        .note-compose-footer{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:14px}
+        .mood-row{display:flex;gap:5px}
+        .mood-btn{padding:6px;border-radius:8px;font-size:1.1rem;transition:all .18s}
+        .mood-btn:hover,.mood-btn.active{background:rgba(255,255,255,0.1);transform:scale(1.1)}
+        .commit-btn{background:#fff;color:#000;font-weight:700;padding:9px 20px;border-radius:100px;font-size:0.84rem;transition:all .18s}
+        .commit-btn:hover{transform:scale(1.04)}
+        .journal-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px;flex-wrap:wrap}
+        .search-bar{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,0.04);
+          border:1px solid var(--border);border-radius:100px;padding:9px 18px;flex:1;max-width:380px}
+        .search-icon{font-size:0.9rem;color:var(--muted)}
+        .search-input{background:transparent;border:none;color:var(--text);font-size:0.875rem;outline:none;width:100%}
+        .search-input::placeholder{color:var(--muted)}
+        .view-toggle{display:flex;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+        .view-toggle-btn{padding:8px 13px;font-size:0.9rem;color:var(--muted);transition:all .18s}
+        .view-toggle-btn.active{background:rgba(255,255,255,0.1);color:var(--text)}
+        .notes-grid{display:grid;gap:12px}
+        .notes-grid.list{grid-template-columns:1fr}
+        .notes-grid.grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+        .note-empty{padding:48px 24px;text-align:center;color:var(--muted);background:rgba(255,255,255,0.02);border:1px dashed var(--border);border-radius:var(--r)}
+        .note-card{background:rgba(12,12,18,0.8);backdrop-filter:blur(10px);border:1px solid var(--border);
+          border-radius:var(--r);padding:20px;cursor:pointer;relative:relative;overflow:hidden;transition:all .2s}
+        .note-card:hover{border-color:var(--border2);background:rgba(255,255,255,0.03);transform:translateY(-1px)}
+        .note-card-title{font-size:0.95rem;font-weight:600;color:var(--text);margin-bottom:7px}
+        .note-card-content{font-size:0.84rem;color:var(--muted);line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+        .note-card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+        .note-date{font-size:0.73rem;color:var(--muted)}
+        .note-mood{font-size:1rem}
+        .note-pinned-badge{position:absolute;top:12px;right:12px;font-size:0.75rem}
+        .note-actions{position:absolute;top:10px;right:10px;display:flex;gap:5px;opacity:0;transition:opacity .18s}
+        .note-card:hover .note-actions{opacity:1}
+        .note-action-btn{background:rgba(0,0,0,0.7);border:1px solid var(--border);padding:4px 7px;border-radius:5px;font-size:0.76rem;color:var(--text);transition:all .18s}
+        .note-action-btn:hover{background:rgba(255,255,255,0.1)}
+        .note-view-content{font-size:0.95rem;color:#ccc;line-height:1.8;white-space:pre-wrap}
+
+        /* ── MODALS ── */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);
+          display:flex;align-items:center;justify-content:center;z-index:1000;
+          opacity:0;pointer-events:none;transition:opacity .25s}
+        .modal-overlay.open{opacity:1;pointer-events:auto}
+        .modal{background:#0e0e16;border:1px solid var(--border2);border-radius:var(--r2);padding:30px;
+          width:92%;max-width:430px;transform:translateY(12px) scale(.97);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+        .modal-overlay.open .modal{transform:translateY(0) scale(1)}
+        .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
+        .modal-title{font-family:var(--fn-head);font-size:1.1rem;font-weight:700;color:#fff}
+        .modal-close{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,0.06);
+          color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:0.9rem;transition:all .18s}
+        .modal-close:hover{background:rgba(255,255,255,0.12);color:var(--text)}
+        .modal-input{width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border);color:var(--text);
+          padding:11px 14px;border-radius:10px;font-size:0.9rem;outline:none;margin-bottom:12px;transition:border-color .2s}
+        .modal-input:focus{border-color:var(--accent)}
+        .modal-label{display:block;font-size:0.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+        .modal-save-btn{width:100%;background:var(--accent);color:#fff;font-weight:600;padding:12px;border-radius:10px;font-size:0.9rem;transition:all .18s;margin-bottom:8px}
+        .modal-save-btn:hover{opacity:.88}
+        .modal-danger-btn{width:100%;background:rgba(248,113,113,0.1);color:var(--red);border:1px solid rgba(248,113,113,0.2);
+          font-weight:600;padding:12px;border-radius:10px;font-size:0.9rem;transition:all .18s;margin-bottom:8px}
+        .modal-danger-btn:hover{background:rgba(248,113,113,0.2)}
+        .modal-cancel-btn{width:100%;background:transparent;color:var(--muted);padding:9px;border-radius:10px;font-size:0.875rem;transition:color .18s}
+        .modal-cancel-btn:hover{color:var(--text)}
+        .time-input-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+        .icon-picker{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-bottom:14px}
+        .icon-option{padding:7px;border-radius:7px;font-size:1.1rem;text-align:center;border:2px solid transparent;cursor:pointer;transition:all .18s}
+        .icon-option:hover{background:rgba(255,255,255,0.07)}
+        .icon-option.selected{border-color:var(--accent);background:var(--accent-lo)}
+        .subtask-add-row{display:flex;gap:7px;margin-bottom:6px}
+        .subtask-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:0.84rem;color:var(--muted)}
+        .subtask-check{width:15px;height:15px;border-radius:4px;border:1px solid var(--border2);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.6rem}
+
+        /* ── TOAST ── */
+        .toast-container{position:fixed;bottom:28px;right:28px;z-index:3000;display:flex;flex-direction:column;gap:8px}
+        .toast{background:rgba(14,14,22,0.95);backdrop-filter:blur(20px);border:1px solid var(--border2);
+          color:var(--text);padding:11px 20px;border-radius:100px;font-size:0.875rem;font-weight:500;
+          box-shadow:0 8px 24px rgba(0,0,0,0.4);animation:toastIn .3s cubic-bezier(.16,1,.3,1);
+          display:flex;align-items:center;gap:10px}
+        .toast.success::before{content:'●';color:var(--green);font-size:0.55rem}
+        .toast.error::before{content:'●';color:var(--red);font-size:0.55rem}
+        @keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+        /* ── CELEBRATE ── */
+        .celebrate-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);
+          display:flex;align-items:center;justify-content:center;z-index:2000;opacity:0;
+          pointer-events:none;transition:opacity .3s}
+        .celebrate-overlay.visible{opacity:1;pointer-events:auto}
+        .celebrate-card{background:#0e0e16;border:1px solid var(--border2);border-radius:var(--r2);padding:48px;text-align:center}
+        .celebrate-emoji{font-size:3.5rem;margin-bottom:14px}
+        .celebrate-title{font-family:var(--fn-head);font-size:1.4rem;font-weight:700;color:#fff;margin-bottom:8px}
+        .celebrate-sub{font-size:0.875rem;color:var(--muted)}
+
+        /* ── RESPONSIVE ── */
+        @media(max-width:800px){
+          :root{--sidebar:220px}
+          .main{padding:28px 24px}
+          .stats-row{grid-template-columns:1fr 1fr}
         }
-        .ritual-card:hover { background: rgba(255,255,255,0.04); border-color: var(--border2); }
-        .ritual-card.completed { border-color: rgba(74,222,128,0.2); background: rgba(74,222,128,0.04); }
-        .r-info { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
-        .r-icon { font-size: 1.3rem; width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .r-name { font-size: 0.9rem; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .r-streak { font-size: 0.72rem; color: var(--accent); margin-top: 2px; }
-        .r-check {
-          width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--border2);
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-          transition: all 0.2s; font-size: 0.8rem;
+        @media(max-width:640px){
+          #app{flex-direction:column}
+          .sidebar{width:100%;height:auto;position:static;flex-direction:row;padding:12px 14px;
+            gap:2px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--border)}
+          .sidebar-brand,.sidebar-spacer,.sidebar-bottom{display:none}
+          .nav-btn{flex-direction:column;gap:3px;font-size:0.68rem;padding:8px 12px;min-width:60px}
+          .nav-icon{width:20px;height:20px}
+          .nav-btn.active::before{top:0;left:8px;right:8px;bottom:auto;width:auto;height:2px;border-radius:0 0 3px 3px}
+          .main{padding:20px 16px}
+          .page-title{font-size:1.7rem}
+          .stats-row{grid-template-columns:1fr}
+          .dash-layout{grid-template-columns:1fr}
         }
-        .ritual-card.completed .r-check { background: var(--green); border-color: var(--green); color: #000; box-shadow: 0 0 12px rgba(74,222,128,0.35); }
-        .add-ritual-btn {
-          border: 1px dashed rgba(255,255,255,0.12); border-radius: var(--r1);
-          display: flex; align-items: center; justify-content: center; gap: 8px;
-          color: var(--muted); min-height: 70px; font-weight: 500; font-size: 0.875rem;
-          transition: all 0.2s; width: 100%;
-        }
-        .add-ritual-btn:hover { border-color: rgba(255,255,255,0.25); color: var(--text); background: rgba(255,255,255,0.03); }
-
-        /* ── TASKS ───────────────────────────────────────────────────────── */
-        .task-add-bar {
-          display: flex; gap: 10px; align-items: center;
-          background: rgba(12,12,16,0.9); backdrop-filter: blur(20px);
-          border: 1px solid var(--border); border-radius: 100px;
-          padding: 8px 8px 8px 22px; margin-bottom: 28px;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-        }
-        .task-input { flex: 1; background: transparent; border: none; font-size: 0.95rem; color: var(--text); outline: none; min-width: 0; }
-        .task-input::placeholder { color: var(--muted); }
-        .priority-select { background: transparent; border: none; color: var(--muted); font-size: 0.85rem; outline: none; cursor: pointer; padding: 0 4px; }
-        .priority-select:hover { color: var(--text); }
-        option { background: #111; }
-        .add-btn {
-          background: #fff; color: #000; font-weight: 600; font-size: 0.875rem;
-          padding: 10px 20px; border-radius: 100px; transition: all 0.18s; flex-shrink: 0;
-        }
-        .add-btn:hover { transform: scale(1.04); box-shadow: 0 4px 16px rgba(255,255,255,0.15); }
-
-        .task-filters { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
-        .filter-btn {
-          padding: 7px 16px; border-radius: 100px; font-size: 0.82rem; font-weight: 500;
-          color: var(--muted); border: 1px solid transparent; transition: all 0.18s;
-        }
-        .filter-btn:hover { color: var(--text); background: var(--glass); }
-        .filter-btn.active { color: var(--text); background: rgba(255,255,255,0.1); border-color: var(--border); }
-
-        .task-list { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        @media (min-width: 1100px) { .task-list { grid-template-columns: 1fr 1fr; gap: 14px; } }
-
-        .task-item {
-          background: rgba(14,14,20,0.7); backdrop-filter: blur(12px);
-          border: 1px solid var(--border); border-radius: var(--r1);
-          padding: 16px 18px; display: flex; align-items: flex-start; gap: 14px;
-          transition: all 0.2s;
-        }
-        .task-item:hover { background: rgba(255,255,255,0.03); border-color: var(--border2); transform: translateY(-1px); }
-        .task-item.completed { opacity: 0.5; }
-        .task-check {
-          width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--border2);
-          display: flex; align-items: center; justify-content: center; cursor: pointer;
-          transition: all 0.18s; flex-shrink: 0; margin-top: 1px; font-size: 0.7rem;
-        }
-        .task-item.completed .task-check { background: var(--accent); border-color: var(--accent); color: #fff; }
-        .task-content { flex: 1; min-width: 0; }
-        .task-text { font-size: 0.9rem; color: var(--text); line-height: 1.4; }
-        .task-item.completed .task-text { text-decoration: line-through; color: var(--muted); }
-        .task-meta { display: flex; gap: 8px; margin-top: 6px; align-items: center; }
-        .task-badge { padding: 2px 8px; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
-        .badge-high { background: rgba(248,113,113,0.15); color: var(--red); }
-        .badge-med { background: rgba(251,191,36,0.12); color: var(--yellow); }
-        .badge-low { background: rgba(74,222,128,0.1); color: var(--green); }
-        .task-actions { display: flex; gap: 6px; opacity: 0; transition: opacity 0.18s; flex-shrink: 0; }
-        .task-item:hover .task-actions { opacity: 1; }
-        .task-action-btn { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; transition: all 0.18s; }
-        .task-edit-btn { background: rgba(255,255,255,0.05); color: var(--muted); }
-        .task-edit-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
-        .task-del-btn { background: rgba(248,113,113,0.08); color: var(--red); }
-        .task-del-btn:hover { background: rgba(248,113,113,0.2); }
-
-        /* ── FOCUS TIMER ─────────────────────────────────────────────────── */
-        .focus-layout { display: grid; grid-template-columns: 1fr; gap: 32px; }
-        @media (min-width: 1100px) { .focus-layout { grid-template-columns: 1fr 360px; } }
-
-        .timer-card {
-          background: linear-gradient(160deg, rgba(20,20,28,0.8), rgba(12,12,16,0.8));
-          border: 1px solid var(--border); border-top-color: rgba(255,255,255,0.1);
-          border-radius: var(--r2); padding: 48px 40px;
-          display: flex; flex-direction: column; align-items: center; text-align: center;
-          gap: 32px;
-        }
-        .mode-pills {
-          display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
-          background: rgba(0,0,0,0.4); padding: 6px; border-radius: 100px;
-          border: 1px solid var(--border);
-        }
-        .mode-pill { padding: 8px 18px; border-radius: 100px; font-size: 0.82rem; font-weight: 500; color: var(--muted); transition: all 0.2s; }
-        .mode-pill:hover { color: var(--text); }
-        .mode-pill.active { background: rgba(255,255,255,0.12); color: var(--text); }
-
-        .timer-ring-wrap { position: relative; width: 260px; height: 260px; display: flex; align-items: center; justify-content: center; }
-        .timer-ring-svg { position: absolute; top: 0; left: 0; transform: rotate(-90deg); }
-        .timer-ring-fg { transition: stroke-dashoffset 0.5s ease; }
-        .timer-display { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-        .timer-time { font-family: var(--font-mono); font-size: 4rem; font-weight: 300; letter-spacing: -0.02em; color: #fff; line-height:1; }
-        .timer-phase { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); margin-top: 8px; }
-
-        .sprint-dots { display: flex; gap: 8px; }
-        .sprint-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border2); transition: all 0.3s; }
-        .sprint-dot.done { background: var(--accent); box-shadow: 0 0 8px var(--accent-lo); }
-
-        .timer-controls { display: flex; align-items: center; gap: 20px; }
-        .ctrl-btn { width: 52px; height: 52px; border-radius: 50%; background: rgba(255,255,255,0.06); color: var(--text); font-size: 1.1rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; border: 1px solid var(--border); }
-        .ctrl-btn:hover { background: rgba(255,255,255,0.12); transform: scale(1.05); }
-        .ctrl-btn-main { width: 72px; height: 72px; border-radius: 50%; background: #fff; color: #000; font-size: 1.4rem; display: flex; align-items: center; justify-content: center; transition: all 0.2s; box-shadow: 0 8px 24px rgba(255,255,255,0.15); }
-        .ctrl-btn-main:hover { transform: scale(1.06); box-shadow: 0 12px 32px rgba(255,255,255,0.25); }
-
-        .focus-sidebar-card { background: rgba(14,14,20,0.7); border: 1px solid var(--border); border-radius: var(--r1); padding: 20px; margin-bottom: 12px; }
-        .focus-sidebar-label { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-        .session-input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); padding: 10px 14px; border-radius: var(--r1); color: var(--text); font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
-        .session-input:focus { border-color: var(--accent); }
-        .tag-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-        .tag-btn { padding: 5px 12px; border-radius: 100px; border: 1px solid var(--border); font-size: 0.78rem; color: var(--muted); transition: all 0.18s; }
-        .tag-btn:hover { color: var(--text); border-color: var(--border2); }
-        .tag-btn.active { background: var(--accent-lo); color: var(--accent); border-color: var(--accent); }
-        .zen-duration-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .zen-dur-btn { padding: 8px 4px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.78rem; color: var(--muted); text-align: center; transition: all 0.18s; }
-        .zen-dur-btn.active { border-color: var(--green); color: var(--green); background: rgba(74,222,128,0.08); }
-        .custom-time-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .time-stepper { display: flex; align-items: center; gap: 6px; }
-        .stepper-btn { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,0.06); color: var(--text); font-size: 1rem; display: flex; align-items: center; justify-content: center; transition: all 0.18s; }
-        .stepper-btn:hover { background: rgba(255,255,255,0.12); }
-        .stepper-val { font-family: var(--font-mono); font-size: 0.9rem; min-width: 28px; text-align: center; color: var(--text); }
-        .preset-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-        .preset-pill { padding: 5px 10px; border-radius: 100px; border: 1px solid var(--border); font-size: 0.75rem; color: var(--muted); transition: all 0.18s; }
-        .preset-pill:hover { color: var(--text); border-color: var(--border2); }
-        .preset-pill.active { color: var(--accent); border-color: var(--accent); background: var(--accent-lo); }
-        .sprint-count-row { display: flex; gap: 8px; flex-wrap: wrap; }
-        .sprint-count-btn { width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; justify-content: center; transition: all 0.18s; }
-        .sprint-count-btn:hover { color: var(--text); border-color: var(--border2); }
-        .sprint-count-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-lo); }
-        .session-log-item { font-size: 0.8rem; color: var(--muted); padding: 6px 0; border-bottom: 1px solid var(--border); }
-        .linked-task-display { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-        .linked-task-label { font-size: 0.8rem; flex: 1; color: var(--text); }
-        .linked-task-clear { font-size: 0.75rem; color: var(--red); }
-        .available-task-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 0.82rem; color: var(--muted); transition: all 0.18s; }
-        .available-task-item:hover { background: var(--glass); color: var(--text); }
-
-        /* ── JOURNAL ─────────────────────────────────────────────────────── */
-        .journal-layout { display: grid; grid-template-columns: 1fr; gap: 32px; }
-        @media (min-width: 1100px) { .journal-layout { grid-template-columns: 380px 1fr; align-items: start; } }
-
-        .note-compose {
-          background: rgba(12,12,16,0.9); backdrop-filter: blur(20px);
-          border: 1px solid var(--border); border-radius: var(--r2); padding: 24px;
-          position: sticky; top: 24px;
-        }
-        .note-title-input { width: 100%; background: transparent; border: none; font-size: 1.1rem; font-weight: 600; color: var(--text); outline: none; margin-bottom: 14px; }
-        .note-title-input::placeholder { color: var(--muted); }
-        .note-content-input { width: 100%; background: transparent; border: none; font-size: 0.9rem; color: #ccc; line-height: 1.65; outline: none; resize: none; margin-bottom: 20px; }
-        .note-content-input::placeholder { color: var(--muted); }
-        .note-compose-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 16px; }
-        .mood-row { display: flex; gap: 6px; }
-        .mood-btn { padding: 7px; border-radius: 8px; background: transparent; font-size: 1.1rem; transition: all 0.18s; }
-        .mood-btn:hover, .mood-btn.active { background: rgba(255,255,255,0.1); transform: scale(1.1); }
-        .commit-btn { background: #fff; color: #000; font-weight: 700; padding: 10px 22px; border-radius: 100px; font-size: 0.85rem; transition: all 0.18s; }
-        .commit-btn:hover { transform: scale(1.04); box-shadow: 0 4px 16px rgba(255,255,255,0.15); }
-
-        .journal-content { min-width: 0; }
-        .journal-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
-        .search-bar { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 100px; padding: 10px 18px; flex: 1; max-width: 400px; }
-        .search-icon { font-size: 0.9rem; color: var(--muted); }
-        .search-input { background: transparent; border: none; color: var(--text); font-size: 0.875rem; outline: none; width: 100%; }
-        .search-input::placeholder { color: var(--muted); }
-        .view-toggle { display: flex; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-        .view-toggle-btn { padding: 8px 14px; font-size: 0.9rem; color: var(--muted); transition: all 0.18s; }
-        .view-toggle-btn.active { background: rgba(255,255,255,0.1); color: var(--text); }
-
-        .notes-grid { display: grid; gap: 14px; }
-        .notes-grid.list { grid-template-columns: 1fr; }
-        .notes-grid.grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-        .note-empty { padding: 48px 24px; text-align: center; color: var(--muted); background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: var(--r1); }
-
-        .note-card {
-          background: rgba(14,14,20,0.7); backdrop-filter: blur(10px);
-          border: 1px solid var(--border); border-radius: var(--r1); padding: 22px;
-          cursor: pointer; position: relative; overflow: hidden; transition: all 0.2s;
-        }
-        .note-card:hover { border-color: var(--border2); background: rgba(255,255,255,0.03); transform: translateY(-1px); }
-        .note-card-title { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
-        .note-card-content { font-size: 0.85rem; color: var(--muted); line-height: 1.6; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-        .note-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
-        .note-date { font-size: 0.75rem; color: var(--muted); }
-        .note-mood { font-size: 1rem; }
-        .note-pinned-badge { position: absolute; top: 12px; right: 12px; font-size: 0.75rem; }
-        .note-actions { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; opacity: 0; transition: opacity 0.18s; }
-        .note-card:hover .note-actions { opacity: 1; }
-        .note-action-btn { background: rgba(0,0,0,0.7); border: 1px solid var(--border); padding: 5px 8px; border-radius: 6px; font-size: 0.78rem; color: var(--text); transition: all 0.18s; }
-        .note-action-btn:hover { background: rgba(255,255,255,0.12); }
-        .note-view-content { font-size: 0.95rem; color: #ccc; line-height: 1.8; white-space: pre-wrap; }
-
-        /* ── MODALS ───────────────────────────────────────────────────────── */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
-        .modal-overlay.open { opacity: 1; pointer-events: auto; }
-        .modal { background: #0e0e16; border: 1px solid var(--border2); border-radius: var(--r2); padding: 32px; width: 92%; max-width: 440px; transform: translateY(12px) scale(0.97); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
-        .modal-overlay.open .modal { transform: translateY(0) scale(1); }
-        .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .modal-title { font-family: var(--font-head); font-size: 1.15rem; font-weight: 700; color: #fff; }
-        .modal-close { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.06); color: var(--muted); font-size: 0.9rem; display: flex; align-items: center; justify-content: center; transition: all 0.18s; }
-        .modal-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
-        .modal-input { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; border-radius: var(--r1); font-size: 0.9rem; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
-        .modal-input:focus { border-color: var(--accent); }
-        .modal-label { display: block; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-        .modal-save-btn { width: 100%; background: var(--accent); color: #fff; font-weight: 600; padding: 13px; border-radius: var(--r1); font-size: 0.9rem; transition: all 0.18s; margin-bottom: 10px; }
-        .modal-save-btn:hover { opacity: 0.88; }
-        .modal-danger-btn { width: 100%; background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.2); font-weight: 600; padding: 13px; border-radius: var(--r1); font-size: 0.9rem; transition: all 0.18s; margin-bottom: 10px; }
-        .modal-danger-btn:hover { background: rgba(248,113,113,0.2); }
-        .modal-cancel-btn { width: 100%; background: transparent; color: var(--muted); padding: 10px; border-radius: var(--r1); font-size: 0.875rem; transition: color 0.18s; }
-        .modal-cancel-btn:hover { color: var(--text); }
-        .time-input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
-        .icon-picker { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 16px; }
-        .icon-option { padding: 8px; border-radius: 8px; font-size: 1.1rem; text-align: center; border: 2px solid transparent; cursor: pointer; transition: all 0.18s; }
-        .icon-option:hover { background: rgba(255,255,255,0.08); }
-        .icon-option.selected { border-color: var(--accent); background: var(--accent-lo); }
-        .subtask-add-row { display: flex; gap: 8px; margin-bottom: 8px; }
-        .subtask-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; color: var(--muted); }
-        .subtask-check { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border2); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; }
-
-        /* ── CELEBRATION ─────────────────────────────────────────────────── */
-        .celebrate-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 2000; display: none; }
-        .celebrate-overlay.visible { display: flex; }
-        .celebrate-card { background: #0e0e16; border: 1px solid var(--border2); border-radius: var(--r2); padding: 48px; text-align: center; }
-        .celebrate-emoji { font-size: 4rem; margin-bottom: 16px; }
-        .celebrate-title { font-family: var(--font-head); font-size: 1.5rem; font-weight: 700; color: #fff; margin-bottom: 8px; }
-        .celebrate-sub { font-size: 0.9rem; color: var(--muted); }
-
-        /* ── TOAST ───────────────────────────────────────────────────────── */
-        .toast-container { position: fixed; bottom: 32px; right: 32px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
-        .toast { background: rgba(18,18,26,0.95); backdrop-filter: blur(20px); border: 1px solid var(--border2); color: var(--text); padding: 12px 20px; border-radius: 100px; font-size: 0.875rem; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.4); animation: toastIn 0.3s cubic-bezier(0.16,1,0.3,1); display: flex; align-items: center; gap: 10px; }
-        .toast.success::before { content: '●'; color: var(--green); font-size: 0.6rem; }
-        .toast.error::before { content: '●'; color: var(--red); font-size: 0.6rem; }
-        @keyframes toastIn { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-
-        /* ── RESPONSIVE ──────────────────────────────────────────────────── */
-        @media (max-width: 900px) {
-          :root { --sidebar: 220px; }
-          .main { padding: 32px 28px; }
-          .task-add-bar { flex-wrap: wrap; border-radius: var(--r1); }
-        }
-        @media (max-width: 700px) {
-          #app { flex-direction: column; }
-          .sidebar { width: 100%; height: auto; position: static; flex-direction: row; padding: 14px 16px; gap: 4px; overflow-x: auto; border-right: none; border-bottom: 1px solid var(--border); }
-          .sidebar-brand, .sidebar-spacer, .sidebar-bottom { display: none; }
-          .nav-btn { flex-direction: column; gap: 4px; font-size: 0.7rem; padding: 8px 12px; min-width: 64px; }
-          .nav-icon { width: 20px; height: 20px; }
-          .nav-btn.active::before { top: 0; left: 8px; right: 8px; bottom: auto; width: auto; height: 2px; border-radius: 0 0 3px 3px; }
-          .main { padding: 24px 18px; }
-          .page-title { font-size: 1.8rem; }
-          .bento-3 { grid-template-columns: 1fr; }
-          .timer-ring-wrap { width: 200px; height: 200px; }
-          .timer-time { font-size: 3rem; }
-        }
-
-        /* Theme modes */
-        [data-mode="pomodoro"] { --accent: #1A73E8; --accent-lo: rgba(26,115,232,0.15); }
-        [data-mode="deep_work"] { --accent: #9C27B0; --accent-lo: rgba(156,39,176,0.15); }
-        [data-mode="zen"] { --accent: #0F9D58; --accent-lo: rgba(15,157,88,0.15); }
-        [data-mode="custom"] { --accent: #F57C00; --accent-lo: rgba(245,124,0,0.15); }
-
-        /* session log */
-        .session-log-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
-        .session-log-item:last-child { border-bottom: none; }
-        .log-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .log-name { flex: 1; font-size: 0.85rem; color: var(--text); }
-        .log-meta { font-size: 0.75rem; color: var(--muted); text-align: right; }
-        .log-empty { font-size: 0.82rem; color: var(--muted); padding: 8px 0; }
-        .task-empty { padding: 32px; text-align: center; color: var(--muted); font-size: 0.9rem;
-          background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: var(--r1); grid-column: 1 / -1; }
-
+        [data-mode="pomodoro"]{--accent:#1A73E8;--accent-lo:rgba(26,115,232,.13)}
+        [data-mode="deep_work"]{--accent:#9C27B0;--accent-lo:rgba(156,39,176,.13)}
+        [data-mode="zen"]{--accent:#0F9D58;--accent-lo:rgba(15,157,88,.13)}
+        [data-mode="custom"]{--accent:#F57C00;--accent-lo:rgba(245,124,0,.13)}
     </style>
 </head>
 <body>
@@ -496,7 +394,7 @@
 <div id="pair-screen">
     <div class="pair-card">
         <div class="pair-logo">Monolith</div>
-        <p class="pair-subtitle">Open your Monolith app → Dashboard → Settings → Web Remote. Enter the code shown here.</p>
+        <p class="pair-subtitle">Open your Monolith app → Dashboard → Settings → Web Remote and enter the code below.</p>
         <div class="sync-code-display" id="pair-code-display">------</div>
         <div class="pair-hint"><div class="pulse-dot"></div><span id="pair-status">Generating code…</span></div>
         <button class="demo-btn" onclick="enterDemoMode()">Try Demo Mode</button>
@@ -505,23 +403,22 @@
 
 <!-- MAIN APP -->
 <div id="app" class="hidden">
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-brand">Monolith</div>
         <button class="nav-btn active" data-view="dashboard" onclick="nav('dashboard')">
-            <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             <span>Dashboard</span>
         </button>
         <button class="nav-btn" data-view="tasks" onclick="nav('tasks')">
-            <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
             <span>Tasks</span>
         </button>
         <button class="nav-btn" data-view="focus" onclick="nav('focus')">
-            <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <span>Focus</span>
         </button>
         <button class="nav-btn" data-view="journal" onclick="nav('journal')">
-            <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+            <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
             <span>Journal</span>
         </button>
         <div class="sidebar-spacer"></div>
@@ -531,78 +428,75 @@
         </div>
     </aside>
 
-    <!-- MAIN -->
     <main class="main">
+
         <!-- DASHBOARD -->
         <section class="view active" id="view-dashboard">
             <div class="page-header">
                 <h1 class="page-title" id="dash-greeting">Good morning.</h1>
                 <p class="page-sub" id="dash-date">Loading…</p>
             </div>
-            <div class="dashboard-desktop-layout">
-                <div class="dashboard-main-col">
-                    <div class="bento bento-3">
-                        <!-- Greeting + weather -->
-                        <div class="card greeting-card">
-                            <p class="greeting-sub" id="dash-motivation">Rise. Execute. Repeat.</p>
-                            <div class="weather-row" id="weather-row">
-                                <span class="weather-icon" id="w-icon">☁️</span>
-                                <div>
-                                    <div class="weather-temp" id="w-temp">--°</div>
-                                    <div class="weather-desc" id="w-desc">Loading…</div>
-                                </div>
-                                <div style="margin-left:auto;font-size:0.75rem;color:var(--muted);line-height:1.4;" id="w-extra"></div>
-                            </div>
-                            <div class="hourly-graph" id="hourly-graph" style="display:none"></div>
+            <div class="dash-layout">
+                <!-- LEFT COL -->
+                <div>
+                    <!-- Motivation banner -->
+                    <div class="motivation-bar" id="motivation-bar">
+                        <span id="dash-motivation-icon">🌱</span>
+                        <span class="motivation-text" id="dash-motivation">Rise. Execute. Repeat.</span>
+                    </div>
+
+                    <!-- Stats row -->
+                    <div class="stats-row">
+                        <div class="stat-card" style="--glow:rgba(124,111,255,0.14)">
+                            <div class="stat-label">Active Tasks</div>
+                            <div class="stat-value" id="dash-task-count">0</div>
+                            <div class="stat-sub">pending</div>
                         </div>
-                        <!-- Task count -->
-                        <div class="card card-glow">
-                            <div class="card-label">Active Tasks</div>
-                            <div class="card-value" id="dash-task-count">0</div>
+                        <div class="stat-card" style="--glow:rgba(62,207,142,0.12)">
+                            <div class="stat-label">Rituals Done</div>
+                            <div class="stat-value" id="ritual-count-text">0/0</div>
+                            <div class="stat-sub"><span id="ritual-pct">0%</span> complete</div>
                         </div>
-                        <!-- Rituals progress -->
-                        <div class="card">
-                            <div class="card-label">Rituals Today</div>
-                            <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-                                <div class="completion-ring-wrap">
-                                    <svg width="64" height="64" class="timer-ring-svg">
-                                        <circle class="timer-ring-bg" cx="32" cy="32" r="26" stroke-width="5" fill="none"/>
-                                        <circle id="ritual-ring" cx="32" cy="32" r="26" stroke-width="5" fill="none"
-                                                stroke="var(--accent)" stroke-linecap="round"
-                                                stroke-dasharray="163.36" stroke-dashoffset="163.36"
-                                                style="transition:stroke-dashoffset 0.6s ease;"/>
-                                    </svg>
-                                    <div class="completion-ring-label">
-                                        <div class="ring-pct" id="ritual-pct">0%</div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div style="font-size:1.4rem;font-weight:800;font-family:var(--font-head);" id="ritual-count-text">0/0</div>
-                                    <div style="font-size:0.75rem;color:var(--muted);">completed</div>
-                                </div>
-                            </div>
+                        <div class="stat-card" style="--glow:rgba(251,191,36,0.1)" id="weather-stat">
+                            <div class="stat-label">Weather</div>
+                            <div class="stat-value" style="font-size:2rem" id="w-temp">--°</div>
+                            <div class="stat-sub"><span id="w-icon">☁️</span> <span id="w-desc">Loading…</span></div>
                         </div>
                     </div>
 
-                    <!-- Quote -->
-                    <div class="card quote-card" style="margin-top:24px;">
+                    <!-- Hourly weather + quote -->
+                    <div class="weather-card" id="weather-card" style="display:none">
+                        <div class="hourly-graph" id="hourly-graph"></div>
+                        <div style="font-size:0.75rem;color:var(--muted);margin-top:6px" id="w-extra"></div>
+                    </div>
+
+                    <div class="quote-card" style="margin-top:20px">
                         <div class="quote-text" id="dash-quote">"Crafting your morning inspiration…"</div>
                         <div class="quote-author" id="dash-quote-author">— Daily Hub</div>
                     </div>
                 </div>
 
-                <div class="dashboard-side-col">
-                    <!-- Rituals section -->
-                    <div class="rituals-section">
-                        <div class="section-head">
-                            <div class="section-title">Daily Rituals</div>
-                            <div style="font-size:0.75rem;color:var(--muted)" id="ritual-sub">Synced from app</div>
+                <!-- RIGHT COL — Rituals -->
+                <div class="rituals-panel">
+                    <div class="rituals-panel-head">
+                        <div class="rituals-panel-title">Daily Rituals</div>
+                        <div class="rituals-progress-wrap">
+                            <svg width="36" height="36" style="transform:rotate(-90deg)">
+                                <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="3"/>
+                                <circle id="ritual-ring" cx="18" cy="18" r="14" fill="none" stroke="var(--green)"
+                                    stroke-width="3" stroke-linecap="round"
+                                    stroke-dasharray="87.96" stroke-dashoffset="87.96"
+                                    style="transition:stroke-dashoffset .6s ease"/>
+                            </svg>
+                            <span class="rituals-pct-text" id="ritual-pct">0%</span>
                         </div>
-                        <div class="rituals-grid" id="rituals-grid">
-                            <button class="add-ritual-btn" onclick="openRitualModal()">
-                                <span style="font-size:1.1rem">＋</span> New Ritual
-                            </button>
-                        </div>
+                    </div>
+                    <div class="ritual-progress-bar">
+                        <div class="ritual-progress-fill" id="ritual-progress-fill" style="width:0%"></div>
+                    </div>
+                    <div class="rituals-list" id="rituals-grid"></div>
+                    <div class="ritual-add-row">
+                        <button class="ritual-add-btn" onclick="openRitualModal()">＋ Add Ritual</button>
                     </div>
                 </div>
             </div>
@@ -634,7 +528,7 @@
             <div class="task-filters">
                 <button class="filter-btn active" data-filter="all" onclick="setTaskFilter('all',this)">All</button>
                 <button class="filter-btn" data-filter="active" onclick="setTaskFilter('active',this)">Active</button>
-                <button class="filter-btn" data-filter="completed" onclick="setTaskFilter('completed',this)">Completed</button>
+                <button class="filter-btn" data-filter="completed" onclick="setTaskFilter('completed',this)">Done</button>
                 <button class="filter-btn" data-filter="high" onclick="setTaskFilter('high',this)">🔥 High</button>
                 <button class="filter-btn" data-filter="med" onclick="setTaskFilter('med',this)">⚡ Med</button>
                 <button class="filter-btn" data-filter="low" onclick="setTaskFilter('low',this)">🌿 Low</button>
@@ -649,54 +543,43 @@
                 <p class="page-sub">Remote timer control · Live sync</p>
             </div>
             <div class="focus-layout">
-                <!-- Timer -->
                 <div class="timer-card">
                     <div class="mode-pills" id="mode-pills">
                         <button class="mode-pill active" data-mode="pomodoro" onclick="setMode('pomodoro',this)">🍅 Pomodoro</button>
                         <button class="mode-pill" data-mode="deep_work" onclick="setMode('deep_work',this)">⚡ Deep Work</button>
-                        <button class="mode-pill" data-mode="zen" onclick="setMode('zen',this)">🌿 Zen Flow</button>
+                        <button class="mode-pill" data-mode="zen" onclick="setMode('zen',this)">🌿 Zen</button>
                         <button class="mode-pill" data-mode="custom" onclick="setMode('custom',this)">⚙️ Custom</button>
                     </div>
-                    <div style="position:relative;">
-                        <div class="timer-ring-wrap">
-                            <svg width="260" height="260" class="timer-ring-svg">
-                                <circle class="timer-ring-bg" cx="130" cy="130" r="118" stroke-width="10" fill="none"/>
-                                <circle id="timer-ring-fg" class="timer-ring-fg" cx="130" cy="130" r="118" stroke-width="10" fill="none"
-                                        stroke="var(--accent)" stroke-linecap="round"
-                                        stroke-dasharray="741.4" stroke-dashoffset="0"/>
-                            </svg>
-                            <div class="timer-display">
-                                <div class="timer-time" id="timer-display">25:00</div>
-                                <div class="timer-phase" id="timer-phase">READY</div>
-                                <div id="timer-sprint-info" style="font-family:var(--font-mono);font-size:0.7rem;color:var(--muted);margin-top:4px;"></div>
-                            </div>
+                    <div class="timer-ring-wrap">
+                        <svg width="240" height="240" class="timer-ring-svg">
+                            <circle class="timer-ring-bg" cx="120" cy="120" r="108" stroke-width="8" fill="none"/>
+                            <circle id="timer-ring-fg" class="timer-ring-fg" cx="120" cy="120" r="108" stroke-width="8" fill="none"
+                                    stroke="var(--accent)" stroke-linecap="round"
+                                    stroke-dasharray="678.6" stroke-dashoffset="0"/>
+                        </svg>
+                        <div class="timer-display">
+                            <div class="timer-time" id="timer-display">25:00</div>
+                            <div class="timer-phase" id="timer-phase">READY</div>
+                            <div id="timer-sprint-info" style="font-family:var(--fn-mono);font-size:0.65rem;color:var(--muted);margin-top:4px"></div>
                         </div>
                     </div>
                     <div class="sprint-dots" id="sprint-dots"></div>
-                    <div style="text-align:center;" id="session-name-display">
-                        <div style="font-size:0.82rem;color:var(--muted);" id="linked-task-display-text"></div>
-                    </div>
+                    <div style="font-size:0.8rem;color:var(--muted)" id="session-name-display"></div>
                     <div class="timer-controls">
                         <button class="ctrl-btn" onclick="timerReset()" title="Reset">↺</button>
                         <button class="ctrl-btn-main" id="play-btn" onclick="timerToggle()">▶</button>
-                        <button class="ctrl-btn" onclick="timerSkip()" title="Skip phase">⏭</button>
+                        <button class="ctrl-btn" onclick="timerSkip()" title="Skip">⏭</button>
                     </div>
                 </div>
-
-                <!-- Focus sidebar -->
                 <div>
                     <div class="focus-sidebar-card">
                         <div class="focus-sidebar-label">Session Name</div>
                         <input class="session-input" id="session-name-input" placeholder="e.g. Deep coding sprint…" oninput="sessionNameChanged()"/>
                     </div>
-
                     <div class="focus-sidebar-card" id="zen-duration-card" style="display:none">
                         <div class="focus-sidebar-label">Zen Duration</div>
-                        <div class="zen-duration-grid" id="zen-duration-grid">
-                            <!-- filled by JS -->
-                        </div>
+                        <div class="zen-duration-grid" id="zen-duration-grid"></div>
                     </div>
-
                     <div class="focus-sidebar-card" id="custom-time-card" style="display:none">
                         <div class="focus-sidebar-label">Focus Time</div>
                         <div class="custom-time-row">
@@ -704,48 +587,39 @@
                                 <button class="stepper-btn" onclick="adjustCustomTime('focus','m',-1)">−</button>
                                 <div class="stepper-val" id="custom-focus-m">25</div>
                                 <button class="stepper-btn" onclick="adjustCustomTime('focus','m',1)">+</button>
-                            </div>
-                            <span style="color:var(--muted);font-size:0.75rem;">m</span>
+                            </div><span style="color:var(--muted);font-size:0.75rem">m</span>
                             <div class="time-stepper">
                                 <button class="stepper-btn" onclick="adjustCustomTime('focus','s',-5)">−</button>
                                 <div class="stepper-val" id="custom-focus-s">00</div>
                                 <button class="stepper-btn" onclick="adjustCustomTime('focus','s',5)">+</button>
-                            </div>
-                            <span style="color:var(--muted);font-size:0.75rem;">s</span>
+                            </div><span style="color:var(--muted);font-size:0.75rem">s</span>
                         </div>
                         <div class="preset-pills" id="focus-presets"></div>
-                        <div class="focus-sidebar-label" style="margin-top:14px;">Break Time</div>
+                        <div class="focus-sidebar-label" style="margin-top:12px">Break Time</div>
                         <div class="custom-time-row">
                             <div class="time-stepper">
                                 <button class="stepper-btn" onclick="adjustCustomTime('break','m',-1)">−</button>
                                 <div class="stepper-val" id="custom-break-m">05</div>
                                 <button class="stepper-btn" onclick="adjustCustomTime('break','m',1)">+</button>
-                            </div>
-                            <span style="color:var(--muted);font-size:0.75rem;">m</span>
+                            </div><span style="color:var(--muted);font-size:0.75rem">m</span>
                             <div class="time-stepper">
                                 <button class="stepper-btn" onclick="adjustCustomTime('break','s',-5)">−</button>
                                 <div class="stepper-val" id="custom-break-s">00</div>
                                 <button class="stepper-btn" onclick="adjustCustomTime('break','s',5)">+</button>
-                            </div>
-                            <span style="color:var(--muted);font-size:0.75rem;">s</span>
+                            </div><span style="color:var(--muted);font-size:0.75rem">s</span>
                         </div>
-                        <div class="focus-sidebar-label" style="margin-top:14px;">Sprints</div>
+                        <div class="focus-sidebar-label" style="margin-top:12px">Sprints</div>
                         <div class="sprint-count-row" id="sprint-count-row"></div>
                     </div>
-
                     <div class="focus-sidebar-card">
                         <div class="focus-sidebar-label">Tag</div>
                         <div class="tag-grid" id="focus-tags"></div>
                     </div>
-
                     <div class="focus-sidebar-card">
                         <div class="focus-sidebar-label">Link a Task</div>
-                        <div id="linked-task-wrap">
-                            <div id="no-linked-task" style="font-size:0.8rem;color:var(--muted);">No task linked.</div>
-                        </div>
-                        <div style="margin-top:8px;max-height:200px;overflow-y:auto;" id="available-tasks-list"></div>
+                        <div id="linked-task-wrap"><div id="no-linked-task" style="font-size:0.8rem;color:var(--muted)">No task linked.</div></div>
+                        <div style="margin-top:8px;max-height:180px;overflow-y:auto" id="available-tasks-list"></div>
                     </div>
-
                     <div class="focus-sidebar-card">
                         <div class="focus-sidebar-label">Session Log</div>
                         <div id="session-log"></div>
@@ -761,20 +635,18 @@
                 <p class="page-sub">Your daily notes · Live synced</p>
             </div>
             <div class="journal-layout">
-                <div class="journal-sidebar">
-                    <div class="note-compose">
-                        <input class="note-title-input" id="note-title" placeholder="Entry title…"/>
-                        <textarea class="note-content-input" id="note-content" placeholder="What's on your mind…" rows="6"></textarea>
-                        <div class="note-compose-footer">
-                            <div class="mood-row" id="mood-row">
-                                <button class="mood-btn" data-mood="😀" onclick="selectMood('😀',this)">😀</button>
-                                <button class="mood-btn" data-mood="❤️" onclick="selectMood('❤️',this)">❤️</button>
-                                <button class="mood-btn" data-mood="😐" onclick="selectMood('😐',this)">😐</button>
-                                <button class="mood-btn" data-mood="😩" onclick="selectMood('😩',this)">😩</button>
-                                <button class="mood-btn" data-mood="😡" onclick="selectMood('😡',this)">😡</button>
-                            </div>
-                            <button class="commit-btn" onclick="addNote()">Commit Log</button>
+                <div class="note-compose">
+                    <input class="note-title-input" id="note-title" placeholder="Entry title…"/>
+                    <textarea class="note-content-input" id="note-content" placeholder="What's on your mind…" rows="7"></textarea>
+                    <div class="note-compose-footer">
+                        <div class="mood-row" id="mood-row">
+                            <button class="mood-btn" data-mood="😀" onclick="selectMood('😀',this)">😀</button>
+                            <button class="mood-btn" data-mood="❤️" onclick="selectMood('❤️',this)">❤️</button>
+                            <button class="mood-btn" data-mood="😐" onclick="selectMood('😐',this)">😐</button>
+                            <button class="mood-btn" data-mood="😩" onclick="selectMood('😩',this)">😩</button>
+                            <button class="mood-btn" data-mood="😡" onclick="selectMood('😡',this)">😡</button>
                         </div>
+                        <button class="commit-btn" onclick="addNote()">Commit Log</button>
                     </div>
                 </div>
                 <div class="journal-content">
@@ -792,11 +664,11 @@
                 </div>
             </div>
         </section>
+
     </main>
 </div>
 
 <!-- MODALS -->
-<!-- Ritual modal -->
 <div class="modal-overlay" id="ritual-modal">
     <div class="modal">
         <div class="modal-head">
@@ -809,27 +681,25 @@
             <input class="modal-input" id="ritual-hours" placeholder="Hours" type="number" min="0" style="margin:0"/>
             <input class="modal-input" id="ritual-mins" placeholder="Minutes" type="number" min="0" style="margin:0"/>
         </div>
-        <label class="modal-label" style="margin-top:8px;">SYMBOL</label>
+        <label class="modal-label" style="margin-top:6px">SYMBOL</label>
         <div class="icon-picker" id="ritual-icon-picker"></div>
-        <button class="modal-save-btn" onclick="saveRitual()">Infuse into Rituals</button>
+        <button class="modal-save-btn" onclick="saveRitual()">Save Ritual</button>
         <button class="modal-cancel-btn" onclick="closeModal('ritual-modal')">Cancel</button>
     </div>
 </div>
 
-<!-- Delete confirm modal -->
 <div class="modal-overlay" id="delete-modal">
-    <div class="modal" style="max-width:360px;">
-        <div style="text-align:center;padding:16px 0;">
-            <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+    <div class="modal" style="max-width:340px">
+        <div style="text-align:center;padding:8px 0 20px">
+            <div style="font-size:2rem;margin-bottom:10px">⚠️</div>
             <div class="modal-title" id="delete-modal-title">Remove Ritual?</div>
-            <p style="color:var(--muted);font-size:0.85rem;margin-top:8px;" id="delete-modal-sub">This will permanently remove this ritual.</p>
+            <p style="color:var(--muted);font-size:0.84rem;margin-top:8px" id="delete-modal-sub">This will permanently remove this ritual.</p>
         </div>
         <button class="modal-danger-btn" id="delete-confirm-btn">Remove</button>
         <button class="modal-cancel-btn" onclick="closeModal('delete-modal')">Cancel</button>
     </div>
 </div>
 
-<!-- Task edit modal -->
 <div class="modal-overlay" id="task-modal">
     <div class="modal">
         <div class="modal-head">
@@ -838,13 +708,13 @@
         </div>
         <input class="modal-input" id="task-edit-text" placeholder="Task name…"/>
         <label class="modal-label">PRIORITY</label>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <div style="display:flex;gap:7px;margin-bottom:12px">
             <button class="filter-btn" data-ep="high" onclick="setEditPriority('high',this)">🔥 High</button>
             <button class="filter-btn" data-ep="med" onclick="setEditPriority('med',this)">⚡ Med</button>
             <button class="filter-btn" data-ep="low" onclick="setEditPriority('low',this)">🌿 Low</button>
         </div>
         <label class="modal-label">TAG</label>
-        <select class="modal-input" id="task-edit-tag" style="margin-bottom:14px;">
+        <select class="modal-input" id="task-edit-tag" style="margin-bottom:12px">
             <option value="">No tag</option>
             <option value="Work">Work</option>
             <option value="Personal">Personal</option>
@@ -853,37 +723,35 @@
             <option value="Other">Other</option>
         </select>
         <label class="modal-label">NOTES</label>
-        <textarea class="modal-input" id="task-edit-notes" rows="3" placeholder="Additional notes…" style="resize:vertical;"></textarea>
+        <textarea class="modal-input" id="task-edit-notes" rows="3" placeholder="Additional notes…" style="resize:vertical"></textarea>
         <label class="modal-label">SUBTASKS</label>
         <div id="task-edit-subtasks"></div>
         <div class="subtask-add-row">
-            <input class="modal-input" id="subtask-input" placeholder="Add subtask…" style="margin:0;flex:1;" onkeydown="if(event.key==='Enter')addSubtask()"/>
-            <button class="add-btn" onclick="addSubtask()" style="padding:10px 14px;">+</button>
+            <input class="modal-input" id="subtask-input" placeholder="Add subtask…" style="margin:0;flex:1" onkeydown="if(event.key==='Enter')addSubtask()"/>
+            <button class="add-btn" onclick="addSubtask()" style="padding:9px 14px">+</button>
         </div>
-        <button class="modal-save-btn" style="margin-top:16px;" onclick="saveTaskEdit()">Save Changes</button>
+        <button class="modal-save-btn" style="margin-top:12px" onclick="saveTaskEdit()">Save Changes</button>
         <button class="modal-danger-btn" id="task-delete-btn">Delete Task</button>
         <button class="modal-cancel-btn" onclick="closeModal('task-modal')">Cancel</button>
     </div>
 </div>
 
-<!-- Note view/edit modal -->
 <div class="modal-overlay" id="note-modal">
-    <div class="modal" style="max-width:560px;">
+    <div class="modal" style="max-width:520px">
         <div class="modal-head">
             <div class="modal-title" id="note-modal-title">Note</div>
-            <div style="display:flex;gap:8px;">
-                <button class="modal-close" id="note-pin-btn" title="Pin" style="font-size:0.8rem;">📌</button>
-                <button class="modal-close" id="note-delete-btn" style="color:var(--red);">🗑</button>
+            <div style="display:flex;gap:7px">
+                <button class="modal-close" id="note-pin-btn" style="font-size:0.78rem">📌</button>
+                <button class="modal-close" id="note-delete-btn" style="color:var(--red)">🗑</button>
                 <button class="modal-close" onclick="closeModal('note-modal')">✕</button>
             </div>
         </div>
-        <div style="font-family:var(--font-mono);font-size:0.72rem;color:var(--muted);margin-bottom:16px;" id="note-modal-date"></div>
-        <div id="note-modal-mood" style="font-size:1.5rem;margin-bottom:12px;"></div>
+        <div style="font-family:var(--fn-mono);font-size:0.7rem;color:var(--muted);margin-bottom:14px" id="note-modal-date"></div>
+        <div id="note-modal-mood" style="font-size:1.4rem;margin-bottom:10px"></div>
         <div class="note-view-content" id="note-modal-content"></div>
     </div>
 </div>
 
-<!-- Celebration overlay -->
 <div class="celebrate-overlay" id="celebrate-overlay">
     <div class="celebrate-card">
         <div class="celebrate-emoji">🏆</div>
@@ -892,10 +760,10 @@
     </div>
 </div>
 
-<!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
 
 <script>
+
     // ══════════════════════════════════════════════════════════════════
     // STATE
     // ══════════════════════════════════════════════════════════════════
@@ -1148,9 +1016,11 @@
       document.getElementById('ritual-count-text').textContent = `${done}/${total}`;
       document.getElementById('ritual-pct').textContent = `${pct}%`;
 
-      const circ = 163.36;
+      const circ = 87.96;
       const offset = circ - (pct/100)*circ;
       document.getElementById('ritual-ring').setAttribute('stroke-dashoffset', offset);
+      const fill = document.getElementById('ritual-progress-fill');
+      if (fill) fill.style.width = pct + '%';
 
       // Motivational message
       let msg = 'Rise. Execute. Repeat.';
@@ -1158,7 +1028,13 @@
       else if (pct >= 75) msg = '🔥 Almost there — finish strong.';
       else if (pct >= 50) msg = '⚡ Past the midpoint. Keep going.';
       else if (pct >= 1) msg = '🌱 First steps taken. Build on it.';
-      document.getElementById('dash-motivation').textContent = msg;
+      const motEl = document.getElementById('dash-motivation');
+      const motIcon = document.getElementById('dash-motivation-icon');
+      if (motEl) motEl.textContent = msg.replace(/^[^\w]+/, '').trim();
+      if (motIcon) {
+        const icons = {'100':'🏆','75':'🔥','50':'⚡','1':'🌱','0':'💫'};
+        motIcon.textContent = pct===100?'🏆':pct>=75?'🔥':pct>=50?'⚡':pct>=1?'🌱':'💫';
+      }
     }
 
     function isHabitDoneToday(h) {
@@ -1226,8 +1102,9 @@
       if (w.windspeed) document.getElementById('w-extra').innerHTML = `Wind ${w.windspeed} km/h`;
       if (w.hourly && w.hourly.length > 0) {
         const wrap = document.getElementById('hourly-graph');
-        wrap.style.display = 'block';
         wrap.innerHTML = renderHourlyGraph(w.hourly);
+        const card = document.getElementById('weather-card');
+        if (card) card.style.display = 'block';
       }
     }
 
@@ -1280,24 +1157,36 @@
     // ══════════════════════════════════════════════════════════════════
     // RITUALS
     // ══════════════════════════════════════════════════════════════════
+    const ICON_MAP = {
+      'self-improvement':'🧘','water':'💧','book-open-variant':'📖','run':'🏃',
+      'food-apple':'🍎','sleep':'😴','brain':'🧠','pencil':'✏️','music':'🎵',
+      'camera':'📷','heart':'❤️','lightbulb':'💡','star':'⭐','fire':'🔥',
+      'dumbbell':'🏋️','target':'🎯','leaf':'🌿','sunrise':'🌅','coffee':'☕',
+      'moon':'🌙','sun':'☀️','book':'📚','chart-line':'📈','shield':'🛡️',
+      'meditation':'🧘','yoga':'🧘','walk':'🚶','bicycle':'🚴','swim':'🏊',
+    };
+    function habitIcon(h) {
+      if (!h.iconName) return h.icon || '🧘';
+      if (h.iconName.length <= 4) return h.iconName; // already emoji
+      return ICON_MAP[h.iconName] || '✦';
+    }
+
     function renderRituals() {
       const grid = document.getElementById('rituals-grid');
       let html = '';
       STATE.habits.forEach(h => {
         const done = isHabitDoneToday(h);
+        const icon = habitIcon(h);
         html += `<div class="ritual-card ${done?'completed':''}" onclick="toggleRitual('${h.id}')">
-          <div class="r-info">
-            <div class="r-icon">${h.iconName || h.icon || '🧘'}</div>
-            <div>
-              <div class="r-name">${h.name}</div>
-              <div class="r-streak">${h.count||0} streak</div>
-              ${h.expectedMinutes?`<div style="font-size:0.68rem;color:var(--muted);">Goal: ${h.expectedMinutes}m</div>`:''}
-            </div>
+          <div class="r-icon">${icon}</div>
+          <div class="r-body">
+            <div class="r-name">${h.name}</div>
+            <div class="r-streak">${h.count||0} day streak${h.expectedMinutes?' · Goal: '+h.expectedMinutes+'m':''}</div>
           </div>
-          <div class="r-check" onclick="event.stopPropagation();toggleRitual('${h.id}')">${done?'✓':''}</div>
+          <div class="r-check">${done?'✓':''}</div>
         </div>`;
       });
-      html += `<button class="add-ritual-btn" onclick="openRitualModal()">＋ New Ritual</button>`;
+      html += `<button class="add-ritual-btn" onclick="openRitualModal()">＋ Add Ritual</button>`;
       grid.innerHTML = html;
     }
 
@@ -1547,7 +1436,7 @@
     // ══════════════════════════════════════════════════════════════════
     // FOCUS TIMER
     // ══════════════════════════════════════════════════════════════════
-    const FOCUS_CIRCUMFERENCE = 2 * Math.PI * 118;
+    const FOCUS_CIRCUMFERENCE = 2 * Math.PI * 108;
 
     function initFocusUI() {
       // Tags
@@ -2008,6 +1897,7 @@
     initPairing();
     fetchQuote();
     fetchWeather();
+
 </script>
 </body>
 </html>
