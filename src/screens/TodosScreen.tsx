@@ -203,7 +203,7 @@ const TodoItem = React.memo(({
 
   const checkColor = isShopping ? (colors.secondary || '#FFA93A') : colors.primary;
   const checkBg = checkAnim.interpolate({ inputRange: [0, 1], outputRange: ['transparent', checkColor] });
-  const cfg = PRIORITY_CONFIG[item.priority];
+  const cfg = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG['med'];
   const doneSubtasks = (item.subtasks || []).filter(s => s.completed).length;
   const overdue = item.dueDate && !item.completed && item.dueDate < Date.now();
   const dueSoon = item.dueDate && !item.completed && !overdue && (item.dueDate - Date.now()) < 86_400_000;
