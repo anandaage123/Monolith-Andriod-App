@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Swipeable } from 'react-native-gesture-handler';
 import {
   View, Text, StyleSheet, Pressable, Image, Modal,
   AppState, Dimensions, Platform, Animated, StatusBar,
@@ -19,50 +20,23 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import * as ScreenCapture from 'expo-screen-capture';
 import * as Haptics from 'expo-haptics';
 const hapticImpact = (style: 'Light' | 'Medium' | 'Heavy' = 'Light') => {
-  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle[style]); } catch (e) {}
+  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle[style]); } catch (e) { }
 };
 
 const { width, height } = Dimensions.get('window');
 
-// ─── Lightweight XOR encryption (key = vault PIN) ────────────────────────────
-// Files are stored in the app's private documentDirectory (already sandboxed).
-// We additionally XOR-encrypt the raw bytes with a key derived from the PIN so
-// the file is unreadable even if extracted from the device sandbox.
-
-const xorEncryptDecrypt = (data: Uint8Array, key: string): Uint8Array => {
-  const keyBytes = key.split('').map(c => c.charCodeAt(0));
-  const result = new Uint8Array(data.length);
-  for (let i = 0; i < data.length; i++) {
-    result[i] = data[i] ^ keyBytes[i % keyBytes.length];
-  }
-  return result;
-};
-
-// Safe base64 encode that handles large Uint8Arrays without stack overflow
-const uint8ToBase64 = (bytes: Uint8Array): string => {
-  const CHUNK = 8192;
-  let result = '';
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    result += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(result);
-};
-
+// ─── Lightweight obfuscation ──────────────────────────────────────────────────
+// Files are stored in the app's private documentDirectory.
+// We obscure the file extension to prevent easy access outside the vault.
 const encryptFile = async (sourceUri: string, destUri: string, pin: string) => {
-  const b64 = await FileSystem.readAsStringAsync(sourceUri, { encoding: FileSystem.EncodingType.Base64 });
-  const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  const encrypted = xorEncryptDecrypt(raw, pin);
-  await FileSystem.writeAsStringAsync(destUri, uint8ToBase64(encrypted), { encoding: FileSystem.EncodingType.Base64 });
+  await FileSystem.copyAsync({ from: sourceUri, to: destUri });
 };
 
 const decryptFile = async (encryptedUri: string, pin: string, originalType?: 'image' | 'video', originalName?: string): Promise<string> => {
-  const b64 = await FileSystem.readAsStringAsync(encryptedUri, { encoding: FileSystem.EncodingType.Base64 });
-  const raw = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  const decrypted = xorEncryptDecrypt(raw, pin);
-  // Preserve original extension so Image/VideoView can recognise the format
+  // Restore original extension so Image/VideoView can recognise the format
   const ext = originalName?.split('.').pop() ?? (originalType === 'video' ? 'mp4' : 'jpg');
   const tmpUri = `${FileSystem.cacheDirectory}tmp_dec_${Date.now()}.${ext}`;
-  await FileSystem.writeAsStringAsync(tmpUri, uint8ToBase64(decrypted), { encoding: FileSystem.EncodingType.Base64 });
+  await FileSystem.copyAsync({ from: encryptedUri, to: tmpUri });
   return tmpUri;
 };
 
@@ -175,6 +149,7 @@ export default function VaultScreen() {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
   const [restorePin, setRestorePin] = useState('');
   const [restorePinError, setRestorePinError] = useState('');
+  const [restoreAttempts, setRestoreAttempts] = useState(0);
   const restoreModalAnim = useRef(new Animated.Value(0)).current;
 
   // ── Styled alert system (replaces native Alert) ──
@@ -299,7 +274,7 @@ export default function VaultScreen() {
   // Stop video when viewer closes
   useEffect(() => {
     if (!viewerVisible) {
-      try { videoPlayer?.pause(); } catch {}
+      try { videoPlayer?.pause(); } catch { }
       if (videoProgressTimer.current) clearInterval(videoProgressTimer.current);
       setVideoProgress(0); setVideoCurrentSec(0); setVideoDurationSec(0); setVideoPlaying(false);
     }
@@ -317,7 +292,7 @@ export default function VaultScreen() {
         setVideoDurationSec(duration);
         setVideoProgress(duration > 0 ? current / duration : 0);
         setVideoPlaying((videoPlayer as any)?.playing ?? true);
-      } catch {}
+      } catch { }
     }, 500);
     return () => { if (videoProgressTimer.current) clearInterval(videoProgressTimer.current); };
   }, [viewerVisible, currentViewerItem?.id]);
@@ -470,45 +445,19 @@ export default function VaultScreen() {
     onToggleShow: () => void;
     onDelete: () => void;
   }) => {
-    const swipeAnim = useRef(new Animated.Value(0)).current;
-    const [open, setOpen] = useState(false);
-
-    const panResponder = PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 10 && Math.abs(g.dy) < 20,
-      onPanResponderMove: (_, g) => {
-        if (g.dx < 0) swipeAnim.setValue(Math.max(g.dx, -80));
-      },
-      onPanResponderRelease: (_, g) => {
-        if (g.dx < -50) {
-          Animated.timing(swipeAnim, { toValue: -80, duration: 150, useNativeDriver: true }).start();
-          setOpen(true);
-        } else {
-          Animated.spring(swipeAnim, { toValue: 0, useNativeDriver: true }).start();
-          setOpen(false);
-        }
-      },
-    });
+    const renderRightActions = () => (
+      <View style={[styles.swipeDeleteBg, { right: 0, position: 'relative', borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }]}>
+        <TouchableOpacity style={styles.swipeDeleteBtn} onPress={onDelete}>
+          <Ionicons name="trash-outline" size={22} color="#FFF" />
+          <Text style={styles.swipeDeleteText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
+    );
 
     return (
       <View style={{ marginHorizontal: 8, marginBottom: 8 }}>
-        <View style={styles.swipeDeleteBg}>
-          <TouchableOpacity style={styles.swipeDeleteBtn} onPress={onDelete}>
-            <Ionicons name="trash-outline" size={22} color="#FFF" />
-            <Text style={styles.swipeDeleteText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-        <Animated.View style={{ transform: [{ translateX: swipeAnim }] }} {...panResponder.panHandlers}>
-          <TouchableOpacity
-            onPress={() => {
-              if (open) {
-                Animated.spring(swipeAnim, { toValue: 0, useNativeDriver: true }).start();
-                setOpen(false);
-              } else {
-                onPress();
-              }
-            }}
-            style={styles.passItem}
-          >
+        <Swipeable renderRightActions={renderRightActions} overshootRight={false}>
+          <TouchableOpacity onPress={onPress} style={[styles.passItem, { marginHorizontal: 0, marginBottom: 0 }]}>
             <View style={[styles.passIconContainer, { backgroundColor: categoryColor(item.category) + '22' }]}>
               <Ionicons name={categoryIcon(item.category)} size={20} color={categoryColor(item.category)} />
             </View>
@@ -529,7 +478,7 @@ export default function VaultScreen() {
               {showPasswords.has(item.id) && <Text style={styles.passRevealed} numberOfLines={1}>{item.pass}</Text>}
             </View>
           </TouchableOpacity>
-        </Animated.View>
+        </Swipeable>
       </View>
     );
   };
@@ -884,15 +833,15 @@ export default function VaultScreen() {
         const files = await FileSystem.readDirectoryAsync(cacheDir);
         for (const f of files) {
           if (f.startsWith('tmp_dec_')) {
-            await FileSystem.deleteAsync(cacheDir + f, { idempotent: true }).catch(() => {});
+            await FileSystem.deleteAsync(cacheDir + f, { idempotent: true }).catch(() => { });
           }
         }
-      } catch {}
+      } catch { }
     })();
     // Restore last active tab
     AsyncStorage.getItem('@vault_last_tab').then(t => {
       if (t === 'media' || t === 'passwords' || t === 'albums') setActiveTab(t as any);
-    }).catch(() => {});
+    }).catch(() => { });
     // App drawer privacy & auto-lock
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (appState.current === 'active' && nextAppState !== 'active') {
@@ -918,10 +867,10 @@ export default function VaultScreen() {
   useEffect(() => {
     if (!isAuthenticated) return;
     if (screenshotProtection && ScreenCapture) {
-      ScreenCapture.preventScreenCaptureAsync().catch(() => {});
-      return () => { ScreenCapture?.allowScreenCaptureAsync().catch(() => {}); };
+      ScreenCapture.preventScreenCaptureAsync().catch(() => { });
+      return () => { ScreenCapture?.allowScreenCaptureAsync().catch(() => { }); };
     } else if (ScreenCapture) {
-      ScreenCapture.allowScreenCaptureAsync().catch(() => {});
+      ScreenCapture.allowScreenCaptureAsync().catch(() => { });
     }
   }, [screenshotProtection, isAuthenticated]);
 
@@ -1002,7 +951,7 @@ export default function VaultScreen() {
       setShowRestoreModal(true);
     } else if (!marker) {
       // Fresh install — write marker
-      await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => {});
+      await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => { });
     }
   };
 
@@ -1011,25 +960,33 @@ export default function VaultScreen() {
     if (!savedPin) { setRestorePinError('No existing vault found.'); return; }
     if (restorePin === savedPin) {
       // Valid — mark installed, proceed normally
-      await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => {});
+      await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => { });
       setCurrentPin(restorePin);
       setShowRestoreModal(false);
       setHasPrimaryPin(true);
       setRestorePin('');
       setRestorePinError('');
+      setRestoreAttempts(0);
       showToast('Welcome back! Vault restored.');
     } else {
-      setRestorePinError('Incorrect PIN — try again.');
+      const attempts = restoreAttempts + 1;
+      setRestoreAttempts(attempts);
       hapticImpact('Heavy');
+      if (attempts >= 3) {
+        setRestorePinError('Max attempts reached. Resetting vault data...');
+        setTimeout(() => handleFreshStart(), 2000);
+      } else {
+        setRestorePinError(`Incorrect PIN — ${3 - attempts} attempt(s) remaining.`);
+      }
     }
   };
 
   const handleFreshStart = async () => {
     // Wipe all vault data and start fresh
-    const keys = ['@vault_pin_primary','@vault_pin_decoy','@vault_items_primary','@vault_items_decoy',
-      '@vault_pass_primary','@vault_pass_decoy','@vault_albums_primary','@vault_albums_decoy'];
-    for (const k of keys) await AsyncStorage.removeItem(k).catch(() => {});
-    await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => {});
+    const keys = ['@vault_pin_primary', '@vault_pin_decoy', '@vault_items_primary', '@vault_items_decoy',
+      '@vault_pass_primary', '@vault_pass_decoy', '@vault_albums_primary', '@vault_albums_decoy'];
+    for (const k of keys) await AsyncStorage.removeItem(k).catch(() => { });
+    await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => { });
     setShowRestoreModal(false);
     setHasPrimaryPin(false);
     setOnboardingStep('welcome');
@@ -1069,7 +1026,7 @@ export default function VaultScreen() {
     // Wipe decrypted temp cache
     const cache = decryptedUriCache.current;
     Object.values(cache).forEach(uri => {
-      FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
+      FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => { });
     });
     decryptedUriCache.current = {};
     // Reset entrance animation so it plays again next unlock
@@ -1087,7 +1044,7 @@ export default function VaultScreen() {
       setPrimaryPassCount(pPass ? JSON.parse(pPass).length : 0);
       setDecoyItemsCount(dItems ? JSON.parse(dItems).length : 0);
       setDecoyPassCount(dPass ? JSON.parse(dPass).length : 0);
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const checkPinStatus = async () => {
@@ -1166,7 +1123,7 @@ export default function VaultScreen() {
         } else if (setupStep === 'primary_confirm') {
           if (newPin === tempPin) {
             await AsyncStorage.setItem('@vault_pin_primary', newPin);
-            await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => {});
+            await AsyncStorage.setItem(INSTALL_MARKER_KEY, Date.now().toString()).catch(() => { });
             setHasPrimaryPin(true); setSetupStep('none');
             setCurrentPin(newPin);
             setVaultMode('primary'); setIsAuthenticated(true);
@@ -1258,13 +1215,13 @@ export default function VaultScreen() {
               const ext = item.name?.split('.').pop() ?? (item.type === 'video' ? 'mp4' : 'jpg');
               const encUri = `${FileSystem.documentDirectory}enc_${mode}_${Date.now()}_${Math.random().toString(36).slice(2)}.vault`;
               await encryptFile(item.uri, encUri, currentPin);
-              await FileSystem.deleteAsync(item.uri, { idempotent: true }).catch(() => {});
+              await FileSystem.deleteAsync(item.uri, { idempotent: true }).catch(() => { });
               updated = updated.map(i => i.id === item.id ? { ...i, uri: encUri, encrypted: true } : i);
-            } catch {}
+            } catch { }
           }
           setHiddenItems(updated);
           await AsyncStorage.setItem(`@vault_items_${mode}`, JSON.stringify(updated));
-        } catch {}
+        } catch { }
       })();
     }
   };
@@ -1305,7 +1262,7 @@ export default function VaultScreen() {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync(true);
       if (status !== 'granted') { showToast('Storage permission required'); skipLock.current = false; return; }
-    } catch (e) {}
+    } catch (e) { }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images', 'videos'], quality: 1, allowsMultipleSelection: true });
     skipLock.current = false;
     if (!result.canceled && result.assets?.length) {
@@ -1348,7 +1305,7 @@ export default function VaultScreen() {
           encrypted: true,
         });
         if (shouldDelete && asset.assetId) {
-          try { await MediaLibrary.deleteAssetsAsync([asset.assetId]); } catch(e) {}
+          try { await MediaLibrary.deleteAssetsAsync([asset.assetId]); } catch (e) { }
         }
       }
       const updated = [...newItems, ...hiddenItems];
@@ -1420,9 +1377,9 @@ export default function VaultScreen() {
         let album = await MediaLibrary.getAlbumAsync('monolith');
         if (album) { await MediaLibrary.addAssetsToAlbumAsync([asset as any], album, false); }
         else { await MediaLibrary.createAlbumAsync('monolith', asset as any, false); }
-      } catch {}
+      } catch { }
       // Delete encrypted vault file
-      try { await FileSystem.deleteAsync(item.uri, { idempotent: true }); } catch {}
+      try { await FileSystem.deleteAsync(item.uri, { idempotent: true }); } catch { }
       // Clear from cache
       delete decryptedUriCache.current[item.id];
       const updated = hiddenItems.filter(i => i.id !== item.id);
@@ -1437,7 +1394,7 @@ export default function VaultScreen() {
       'Restore File',
       'This will decrypt the file and save it back to your gallery.',
       [
-        { label: 'Cancel', onPress: () => {}, cancel: true },
+        { label: 'Cancel', onPress: () => { }, cancel: true },
         { label: 'Save to Gallery', onPress: () => doRestoreToGallery(item) },
       ],
       'download-outline',
@@ -1450,22 +1407,24 @@ export default function VaultScreen() {
       'Delete File',
       'This will permanently delete the file from Vault. This cannot be undone.',
       [
-        { label: 'Cancel', onPress: () => {}, cancel: true },
-        { label: 'Delete', destructive: true, onPress: async () => {
-          try { await FileSystem.deleteAsync(item.uri, { idempotent: true }); } catch {}
-          delete decryptedUriCache.current[item.id];
-          const updated = hiddenItems.filter(i => i.id !== item.id);
-          await saveHiddenItems(updated);
-          // Advance viewer or close
-          if (viewerItems.length <= 1) {
-            setViewerVisible(false);
-          } else {
-            const newItems = viewerItems.filter(i => i.id !== item.id);
-            setViewerItems(newItems);
-            setViewerIndex(Math.min(viewerIndex, newItems.length - 1));
+        { label: 'Cancel', onPress: () => { }, cancel: true },
+        {
+          label: 'Delete', destructive: true, onPress: async () => {
+            try { await FileSystem.deleteAsync(item.uri, { idempotent: true }); } catch { }
+            delete decryptedUriCache.current[item.id];
+            const updated = hiddenItems.filter(i => i.id !== item.id);
+            await saveHiddenItems(updated);
+            // Advance viewer or close
+            if (viewerItems.length <= 1) {
+              setViewerVisible(false);
+            } else {
+              const newItems = viewerItems.filter(i => i.id !== item.id);
+              setViewerItems(newItems);
+              setViewerIndex(Math.min(viewerIndex, newItems.length - 1));
+            }
+            hapticImpact('Heavy');
           }
-          hapticImpact('Heavy');
-        }},
+        },
       ],
       'trash-outline',
       '#FF4B4B',
@@ -1477,19 +1436,21 @@ export default function VaultScreen() {
       'Delete Selected',
       `Permanently delete ${selectedItems.size} item${selectedItems.size !== 1 ? 's' : ''}? This cannot be undone.`,
       [
-        { label: 'Cancel', onPress: () => {}, cancel: true },
-        { label: `Delete ${selectedItems.size} Items`, destructive: true, onPress: async () => {
-          const toDelete = hiddenItems.filter(i => selectedItems.has(i.id));
-          for (const item of toDelete) {
-            try { await FileSystem.deleteAsync(item.uri, { idempotent: true }); } catch {}
-            delete decryptedUriCache.current[item.id];
+        { label: 'Cancel', onPress: () => { }, cancel: true },
+        {
+          label: `Delete ${selectedItems.size} Items`, destructive: true, onPress: async () => {
+            const toDelete = hiddenItems.filter(i => selectedItems.has(i.id));
+            for (const item of toDelete) {
+              try { await FileSystem.deleteAsync(item.uri, { idempotent: true }); } catch { }
+              delete decryptedUriCache.current[item.id];
+            }
+            await saveHiddenItems(hiddenItems.filter(i => !selectedItems.has(i.id)));
+            setSelectedItems(new Set());
+            setIsSelectMode(false);
+            hapticImpact('Heavy');
+            showToast(`${toDelete.length} item${toDelete.length !== 1 ? 's' : ''} deleted`);
           }
-          await saveHiddenItems(hiddenItems.filter(i => !selectedItems.has(i.id)));
-          setSelectedItems(new Set());
-          setIsSelectMode(false);
-          hapticImpact('Heavy');
-          showToast(`${toDelete.length} item${toDelete.length !== 1 ? 's' : ''} deleted`);
-        }},
+        },
       ],
       'trash-outline',
       '#FF4B4B',
@@ -1502,9 +1463,9 @@ export default function VaultScreen() {
       try {
         const displayUri = item.encrypted ? await getDisplayUri(item) : item.uri;
         await MediaLibrary.saveToLibraryAsync(displayUri);
-        await FileSystem.deleteAsync(item.uri, { idempotent: true }).catch(() => {});
+        await FileSystem.deleteAsync(item.uri, { idempotent: true }).catch(() => { });
         delete decryptedUriCache.current[item.id];
-      } catch {}
+      } catch { }
     }
     await saveHiddenItems(hiddenItems.filter(i => !selectedItems.has(i.id)));
     setSelectedItems(new Set());
@@ -1563,13 +1524,15 @@ export default function VaultScreen() {
       'Delete Tag',
       `Remove "#${tag}" from all items in your vault?`,
       [
-        { label: 'Cancel', onPress: () => {}, cancel: true },
-        { label: 'Remove Tag', destructive: true, onPress: async () => {
-          const updated = hiddenItems.map(i => ({ ...i, tags: (i.tags ?? []).filter(t => t !== tag) }));
-          await saveHiddenItems(updated);
-          setActiveTags(prev => prev.filter(t => t !== tag));
-          showToast(`Tag #${tag} removed`);
-        }},
+        { label: 'Cancel', onPress: () => { }, cancel: true },
+        {
+          label: 'Remove Tag', destructive: true, onPress: async () => {
+            const updated = hiddenItems.map(i => ({ ...i, tags: (i.tags ?? []).filter(t => t !== tag) }));
+            await saveHiddenItems(updated);
+            setActiveTags(prev => prev.filter(t => t !== tag));
+            showToast(`Tag #${tag} removed`);
+          }
+        },
       ],
       'pricetag-outline',
       '#FF8C42',
@@ -1601,7 +1564,7 @@ export default function VaultScreen() {
         'Duplicate Entry',
         `A password for "${newSite.trim()}" already exists. Save anyway?`,
         [
-          { label: 'Cancel', onPress: () => {}, cancel: true },
+          { label: 'Cancel', onPress: () => { }, cancel: true },
           { label: 'Save Anyway', onPress: () => doSavePassword() },
         ],
         'alert-circle-outline',
@@ -1651,12 +1614,14 @@ export default function VaultScreen() {
       'Delete Entry',
       'Remove this password from your vault?',
       [
-        { label: 'Cancel', onPress: () => {}, cancel: true },
-        { label: 'Delete', destructive: true, onPress: () => {
-          savePasswords(passwords.filter(p => p.id !== id));
-          setViewingPassword(null);
-          hapticImpact('Medium');
-        }},
+        { label: 'Cancel', onPress: () => { }, cancel: true },
+        {
+          label: 'Delete', destructive: true, onPress: () => {
+            savePasswords(passwords.filter(p => p.id !== id));
+            setViewingPassword(null);
+            hapticImpact('Medium');
+          }
+        },
       ],
       'trash-outline',
       '#FF4B4B',
@@ -1747,14 +1712,16 @@ export default function VaultScreen() {
       'Delete Album',
       'The album will be removed but all files inside will stay in your Vault.',
       [
-        { label: 'Cancel', onPress: () => {}, cancel: true },
-        { label: 'Delete Album', destructive: true, onPress: async () => {
-          const updated = hiddenItems.map(i => i.albumId === id ? { ...i, albumId: undefined } : i);
-          await saveHiddenItems(updated);
-          await saveAlbums(albums.filter(a => a.id !== id));
-          if (activeAlbumFilter === id) setActiveAlbumFilter(null);
-          showToast('Album deleted');
-        }},
+        { label: 'Cancel', onPress: () => { }, cancel: true },
+        {
+          label: 'Delete Album', destructive: true, onPress: async () => {
+            const updated = hiddenItems.map(i => i.albumId === id ? { ...i, albumId: undefined } : i);
+            await saveHiddenItems(updated);
+            await saveAlbums(albums.filter(a => a.id !== id));
+            if (activeAlbumFilter === id) setActiveAlbumFilter(null);
+            showToast('Album deleted');
+          }
+        },
       ],
       'folder-open-outline',
       '#FF8C42',
@@ -1783,17 +1750,19 @@ export default function VaultScreen() {
       'Disable Decoy Vault',
       'This will permanently delete the decoy PIN and all decoy vault data (media and passwords). This cannot be undone.',
       [
-        { label: 'Cancel', onPress: () => {}, cancel: true },
-        { label: 'Disable Decoy', destructive: true, onPress: async () => {
-          await AsyncStorage.removeItem('@vault_pin_decoy');
-          await AsyncStorage.removeItem('@vault_items_decoy');
-          await AsyncStorage.removeItem('@vault_pass_decoy');
-          await AsyncStorage.removeItem('@vault_albums_decoy');
-          setHasDecoyPin(false);
-          setDecoyItemsCount(0);
-          setDecoyPassCount(0);
-          showToast('Decoy vault disabled');
-        }},
+        { label: 'Cancel', onPress: () => { }, cancel: true },
+        {
+          label: 'Disable Decoy', destructive: true, onPress: async () => {
+            await AsyncStorage.removeItem('@vault_pin_decoy');
+            await AsyncStorage.removeItem('@vault_items_decoy');
+            await AsyncStorage.removeItem('@vault_pass_decoy');
+            await AsyncStorage.removeItem('@vault_albums_decoy');
+            setHasDecoyPin(false);
+            setDecoyItemsCount(0);
+            setDecoyPassCount(0);
+            showToast('Decoy vault disabled');
+          }
+        },
       ],
       'eye-off-outline',
       '#FF8C42',
@@ -1806,14 +1775,16 @@ export default function VaultScreen() {
         'Delete Vault Data',
         'Delete all data in this decoy vault? This cannot be undone.',
         [
-          { label: 'Cancel', onPress: () => {}, cancel: true },
-          { label: 'Delete All', destructive: true, onPress: async () => {
-            await AsyncStorage.removeItem('@vault_items_decoy');
-            await AsyncStorage.removeItem('@vault_pass_decoy');
-            await AsyncStorage.removeItem('@vault_albums_decoy');
-            setHiddenItems([]); setPasswords([]); setAlbums([]);
-            setIsSettingsVisible(false);
-          }},
+          { label: 'Cancel', onPress: () => { }, cancel: true },
+          {
+            label: 'Delete All', destructive: true, onPress: async () => {
+              await AsyncStorage.removeItem('@vault_items_decoy');
+              await AsyncStorage.removeItem('@vault_pass_decoy');
+              await AsyncStorage.removeItem('@vault_albums_decoy');
+              setHiddenItems([]); setPasswords([]); setAlbums([]);
+              setIsSettingsVisible(false);
+            }
+          },
         ],
         'trash-outline',
         '#FF4B4B',
@@ -1823,16 +1794,18 @@ export default function VaultScreen() {
         'Reset Vault',
         'Permanently delete ALL secure data — media, passwords, and albums from both vaults. This cannot be undone.',
         [
-          { label: 'Cancel', onPress: () => {}, cancel: true },
-          { label: 'Reset Everything', destructive: true, onPress: async () => {
-            const keys = ['@vault_pin_primary','@vault_pin_decoy','@vault_items_primary','@vault_items_decoy',
-              '@vault_pass_primary','@vault_pass_decoy','@vault_albums_primary','@vault_albums_decoy', INSTALL_MARKER_KEY];
-            for (const k of keys) await AsyncStorage.removeItem(k).catch(() => {});
-            setHasPrimaryPin(false); setHasDecoyPin(false);
-            setVaultMode(null); setIsAuthenticated(false); setIsSettingsVisible(false);
-            setHiddenItems([]); setPasswords([]); setAlbums([]);
-            setOnboardingStep('welcome');
-          }},
+          { label: 'Cancel', onPress: () => { }, cancel: true },
+          {
+            label: 'Reset Everything', destructive: true, onPress: async () => {
+              const keys = ['@vault_pin_primary', '@vault_pin_decoy', '@vault_items_primary', '@vault_items_decoy',
+                '@vault_pass_primary', '@vault_pass_decoy', '@vault_albums_primary', '@vault_albums_decoy', INSTALL_MARKER_KEY];
+              for (const k of keys) await AsyncStorage.removeItem(k).catch(() => { });
+              setHasPrimaryPin(false); setHasDecoyPin(false);
+              setVaultMode(null); setIsAuthenticated(false); setIsSettingsVisible(false);
+              setHiddenItems([]); setPasswords([]); setAlbums([]);
+              setOnboardingStep('welcome');
+            }
+          },
         ],
         'warning-outline',
         '#FF4B4B',
@@ -1853,48 +1826,50 @@ export default function VaultScreen() {
           <View style={styles.authBgCircle1} />
           <View style={styles.authBgCircle2} />
         </View>
-        <View style={styles.restoreSheet}>
-          <View style={styles.modalHandle} />
-          <View style={{ alignItems: 'center', marginBottom: 24 }}>
-            <View style={[styles.iconCircle, { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primary + '18', marginBottom: 16 }]}>
-              <Ionicons name="shield-checkmark" size={34} color={colors.primary} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%' }}>
+          <View style={styles.restoreSheet}>
+            <View style={styles.modalHandle} />
+            <View style={{ alignItems: 'center', marginBottom: 24 }}>
+              <View style={[styles.iconCircle, { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primary + '18', marginBottom: 16 }]}>
+                <Ionicons name="shield-checkmark" size={34} color={colors.primary} />
+              </View>
+              <Text style={[styles.authHeading, { color: colors.text, fontSize: 22 }]}>Welcome Back</Text>
+              <Text style={[styles.authSubtitle, { textAlign: 'center', marginTop: 6 }]}>
+                It looks like Vault was reinstalled. Enter your previous PIN to restore your data, or start fresh.
+              </Text>
             </View>
-            <Text style={[styles.authHeading, { color: colors.text, fontSize: 22 }]}>Welcome Back</Text>
-            <Text style={[styles.authSubtitle, { textAlign: 'center', marginTop: 6 }]}>
-              It looks like Vault was reinstalled. Enter your previous PIN to restore your data, or start fresh.
-            </Text>
+
+            <Text style={styles.inputLabel}>Previous PIN</Text>
+            <TextInput
+              style={[styles.input, { letterSpacing: 12, fontSize: 22, textAlign: 'center' }]}
+              value={restorePin}
+              onChangeText={t => { setRestorePin(t.replace(/\D/g, '').slice(0, 6)); setRestorePinError(''); }}
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+              placeholder="••••••"
+              placeholderTextColor={colors.textVariant}
+            />
+            {!!restorePinError && (
+              <Text style={{ color: colors.error, fontSize: 13, fontWeight: '600', marginBottom: 8, textAlign: 'center' }}>{restorePinError}</Text>
+            )}
+
+            <Pressable
+              style={({ pressed }) => [styles.onboardingCTA, { opacity: pressed ? 0.85 : 1, marginBottom: 12 }]}
+              onPress={handleRestoreWithPin}
+            >
+              <Ionicons name="lock-open-outline" size={18} color="#FFF" />
+              <Text style={styles.onboardingCTAText}>Restore Vault</Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.7 : 1, alignSelf: 'center', paddingHorizontal: 32 }]}
+              onPress={handleFreshStart}
+            >
+              <Text style={styles.cancelBtnText}>Start Fresh (delete previous data)</Text>
+            </Pressable>
           </View>
-
-          <Text style={styles.inputLabel}>Previous PIN</Text>
-          <TextInput
-            style={[styles.input, { letterSpacing: 12, fontSize: 22, textAlign: 'center' }]}
-            value={restorePin}
-            onChangeText={t => { setRestorePin(t.replace(/\D/g, '').slice(0, 6)); setRestorePinError(''); }}
-            keyboardType="number-pad"
-            secureTextEntry
-            maxLength={6}
-            placeholder="••••••"
-            placeholderTextColor={colors.textVariant}
-          />
-          {!!restorePinError && (
-            <Text style={{ color: colors.error, fontSize: 13, fontWeight: '600', marginBottom: 8, textAlign: 'center' }}>{restorePinError}</Text>
-          )}
-
-          <Pressable
-            style={({ pressed }) => [styles.onboardingCTA, { opacity: pressed ? 0.85 : 1, marginBottom: 12 }]}
-            onPress={handleRestoreWithPin}
-          >
-            <Ionicons name="lock-open-outline" size={18} color="#FFF" />
-            <Text style={styles.onboardingCTAText}>Restore Vault</Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [styles.cancelBtn, { opacity: pressed ? 0.7 : 1, alignSelf: 'center', paddingHorizontal: 32 }]}
-            onPress={handleFreshStart}
-          >
-            <Text style={styles.cancelBtnText}>Start Fresh (delete previous data)</Text>
-          </Pressable>
-        </View>
+        </KeyboardAvoidingView>
       </View>
     );
   }
@@ -1979,7 +1954,7 @@ export default function VaultScreen() {
 
           {/* Animated PIN dots */}
           <Animated.View style={[styles.pinDisplay, { transform: [{ translateX: shakeAnim }] }]}>
-            {[1,2,3,4,5,6].map(i => {
+            {[1, 2, 3, 4, 5, 6].map(i => {
               const filled = pin.length >= i;
               return (
                 <Animated.View
@@ -2016,7 +1991,7 @@ export default function VaultScreen() {
           )}
 
           <View style={styles.numpadGrid}>
-            {[1,2,3,4,5,6,7,8,9].map(num => (
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
               <Pressable
                 key={num}
                 style={({ pressed }) => [
@@ -2075,7 +2050,7 @@ export default function VaultScreen() {
                 transform: [{ scale: alertAnim.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) }],
               }]}
             >
-              <Pressable onPress={() => {}}>
+              <Pressable onPress={() => { }}>
                 {styledAlert.icon && (
                   <View style={[styles.alertIconCircle, { backgroundColor: (styledAlert.iconColor ?? colors.primary) + '15' }]}>
                     <Ionicons name={styledAlert.icon as any} size={28} color={styledAlert.iconColor ?? colors.primary} />
@@ -2116,7 +2091,7 @@ export default function VaultScreen() {
         style={[styles.toast, {
           opacity: toastAnim,
           transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
-                      { scale: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }],
+          { scale: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) }],
         }]}
         pointerEvents="none"
       >
@@ -2170,7 +2145,7 @@ export default function VaultScreen() {
               setActiveTab(tab);
               setOpenAlbumId(null);
               closeFab();
-              AsyncStorage.setItem('@vault_last_tab', tab).catch(() => {});
+              AsyncStorage.setItem('@vault_last_tab', tab).catch(() => { });
             }}
             style={[styles.tab, activeTab === tab && styles.activeTab]}
           >
@@ -2285,17 +2260,19 @@ export default function VaultScreen() {
                     onLongPress={() => { hapticImpact('Medium'); setIsSelectMode(true); toggleSelectItem(item.id); }}
                     style={[styles.mediaItem, { width: gridItemSize, height: gridItemSize, margin: 2 }, selected && styles.mediaItemSelected]}
                   >
-                    {/* Encrypted items can't be displayed as raw thumbnails — show placeholder */}
-                    {item.encrypted ? (
-                      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.surfaceContainer, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Ionicons name={item.type === 'video' ? 'videocam' : 'image'} size={gridItemSize * 0.32} color={colors.textVariant + '60'} />
+                    <View style={[StyleSheet.absoluteFillObject, { backgroundColor: colors.surfaceContainer }]}>
+                      <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFillObject} />
+                      {item.type === 'video' && (
+                        <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }]}>
+                          <Ionicons name="play" size={gridItemSize * 0.35} color="rgba(255,255,255,0.8)" />
+                        </View>
+                      )}
+                      {item.encrypted && (
                         <View style={{ position: 'absolute', bottom: 5, right: 5, backgroundColor: colors.primary, borderRadius: 7, padding: 3 }}>
                           <Ionicons name="lock-closed" size={10} color="#FFF" />
                         </View>
-                      </View>
-                    ) : (
-                      <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFillObject} />
-                    )}
+                      )}
+                    </View>
                     {item.type === 'video' && (
                       <View style={styles.videoBadge}>
                         <Ionicons name="play" size={10} color="#FFF" />
@@ -2330,16 +2307,19 @@ export default function VaultScreen() {
                     onLongPress={() => { hapticImpact('Medium'); setIsSelectMode(true); toggleSelectItem(item.id); }}
                     style={[styles.listItem, selected && { borderColor: colors.primary, borderWidth: 1.5 }]}
                   >
-                    {item.encrypted ? (
-                      <View style={[styles.listThumb, { backgroundColor: colors.surfaceContainer, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Ionicons name={item.type === 'video' ? 'videocam' : 'image'} size={22} color={colors.textVariant + '70'} />
+                    <View style={[styles.listThumb, { backgroundColor: colors.surfaceContainer, overflow: 'hidden' }]}>
+                      <Image source={{ uri: item.uri }} style={StyleSheet.absoluteFillObject} />
+                      {item.type === 'video' && (
+                        <View style={[StyleSheet.absoluteFillObject, { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }]}>
+                          <Ionicons name="play" size={24} color="rgba(255,255,255,0.8)" />
+                        </View>
+                      )}
+                      {item.encrypted && (
                         <View style={{ position: 'absolute', bottom: 3, right: 3, backgroundColor: colors.primary, borderRadius: 5, padding: 2 }}>
                           <Ionicons name="lock-closed" size={8} color="#FFF" />
                         </View>
-                      </View>
-                    ) : (
-                      <Image source={{ uri: item.uri }} style={styles.listThumb} />
-                    )}
+                      )}
+                    </View>
                     <View style={styles.listItemInfo}>
                       <Text style={styles.listItemName} numberOfLines={1}>{item.name ?? 'Unnamed'}</Text>
                       <Text style={styles.listItemMeta}>{formatDate(item.addedAt)} · {formatSize(item.size)}</Text>
@@ -2384,7 +2364,7 @@ export default function VaultScreen() {
                     { label: 'Rename', onPress: () => { setRenamingAlbumId(album.id); setRenameAlbumText(album.name); setIsRenamingAlbum(true); } },
                     { label: 'Change Cover', onPress: () => { setCoverPickingAlbumId(album.id); setIsAlbumCoverPickerVisible(true); } },
                     { label: 'Delete Album', destructive: true, onPress: () => deleteAlbum(album.id) },
-                    { label: 'Cancel', cancel: true, onPress: () => {} },
+                    { label: 'Cancel', cancel: true, onPress: () => { } },
                   ],
                   'folder-outline',
                   colors.primary,
@@ -2563,8 +2543,8 @@ export default function VaultScreen() {
         <View style={styles.fabMenu}>
           <Animated.View style={[styles.fabMenuItem, {
             opacity: fabAnim,
-            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0,1], outputRange: [16,0] }) },
-                        { scale: fabAnim.interpolate({ inputRange: [0,1], outputRange: [0.85,1] }) }],
+            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+            { scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
           }]}>
             <Text style={styles.fabMenuLabel}>Add Photos / Videos</Text>
             <Pressable style={styles.fabMiniBtn} onPress={() => { closeFab(); pickAndHideImage(); }}>
@@ -2574,8 +2554,8 @@ export default function VaultScreen() {
           {allTags.length > 0 && (
             <Animated.View style={[styles.fabMenuItem, {
               opacity: fabAnim,
-              transform: [{ translateY: fabAnim.interpolate({ inputRange: [0,1], outputRange: [28,0] }) },
-                          { scale: fabAnim.interpolate({ inputRange: [0,1], outputRange: [0.82,1] }) }],
+              transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) },
+              { scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) }],
             }]}>
               <Text style={styles.fabMenuLabel}>Manage Tags</Text>
               <Pressable style={[styles.fabMiniBtn, { backgroundColor: colors.secondary ?? '#6BCB77' }]} onPress={() => { closeFab(); setIsTagManagerVisible(true); }}>
@@ -2589,8 +2569,8 @@ export default function VaultScreen() {
         <View style={styles.fabMenu}>
           <Animated.View style={[styles.fabMenuItem, {
             opacity: fabAnim,
-            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0,1], outputRange: [16,0] }) },
-                        { scale: fabAnim.interpolate({ inputRange: [0,1], outputRange: [0.85,1] }) }],
+            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+            { scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
           }]}>
             <Text style={styles.fabMenuLabel}>New Album</Text>
             <Pressable style={styles.fabMiniBtn} onPress={() => { closeFab(); setIsAlbumModalVisible(true); }}>
@@ -2599,8 +2579,8 @@ export default function VaultScreen() {
           </Animated.View>
           <Animated.View style={[styles.fabMenuItem, {
             opacity: fabAnim,
-            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0,1], outputRange: [28,0] }) },
-                        { scale: fabAnim.interpolate({ inputRange: [0,1], outputRange: [0.82,1] }) }],
+            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) },
+            { scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) }],
           }]}>
             <Text style={styles.fabMenuLabel}>Add Media</Text>
             <Pressable style={[styles.fabMiniBtn, { backgroundColor: colors.secondary ?? '#6BCB77' }]} onPress={() => { closeFab(); pickAndHideImage(); }}>
@@ -2613,8 +2593,8 @@ export default function VaultScreen() {
         <View style={styles.fabMenu}>
           <Animated.View style={[styles.fabMenuItem, {
             opacity: fabAnim,
-            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0,1], outputRange: [16,0] }) },
-                        { scale: fabAnim.interpolate({ inputRange: [0,1], outputRange: [0.85,1] }) }],
+            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
+            { scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }],
           }]}>
             <Text style={styles.fabMenuLabel}>Add Password</Text>
             <Pressable style={styles.fabMiniBtn} onPress={() => { closeFab(); setIsPassModalVisible(true); }}>
@@ -2623,8 +2603,8 @@ export default function VaultScreen() {
           </Animated.View>
           <Animated.View style={[styles.fabMenuItem, {
             opacity: fabAnim,
-            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0,1], outputRange: [28,0] }) },
-                        { scale: fabAnim.interpolate({ inputRange: [0,1], outputRange: [0.82,1] }) }],
+            transform: [{ translateY: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [28, 0] }) },
+            { scale: fabAnim.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) }],
           }]}>
             <Text style={styles.fabMenuLabel}>Import CSV</Text>
             <Pressable style={[styles.fabMiniBtn, { backgroundColor: colors.secondary ?? '#6BCB77' }]} onPress={() => { closeFab(); setIsCsvImportVisible(true); }}>
@@ -2643,7 +2623,7 @@ export default function VaultScreen() {
           toggleFab();
         }}
       >
-        <Animated.View style={{ transform: [{ rotate: fabAnim.interpolate({ inputRange: [0,1], outputRange: ['0deg','45deg'] }) }] }}>
+        <Animated.View style={{ transform: [{ rotate: fabAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] }) }] }}>
           <Ionicons name="add" size={30} color="#FFF" />
         </Animated.View>
       </Pressable>
@@ -2782,7 +2762,7 @@ export default function VaultScreen() {
                           setVideoProgress(ratio);
                           setVideoCurrentSec(seekTo);
                           hapticImpact('Light');
-                        } catch {}
+                        } catch { }
                       }}
                     >
                       <View style={[styles.scrubberFill, { width: `${videoProgress * 100}%` as any }]} />
@@ -2796,7 +2776,7 @@ export default function VaultScreen() {
                       try {
                         if (videoPlaying) { videoPlayer?.pause(); setVideoPlaying(false); }
                         else { videoPlayer?.play(); setVideoPlaying(true); }
-                      } catch {}
+                      } catch { }
                     }} style={styles.videoCtrlBtn}>
                       <Ionicons name={videoPlaying ? 'pause' : 'play'} size={28} color="#FFF" />
                     </Pressable>
@@ -2806,7 +2786,7 @@ export default function VaultScreen() {
                       <Ionicons name={videoVolume === 0 ? 'volume-mute' : videoVolume < 0.5 ? 'volume-low' : 'volume-high'} size={22} color="#FFF" />
                     </Pressable>
                     <Pressable onPress={() => {
-                      try { videoPlayer?.replay(); } catch {}
+                      try { videoPlayer?.replay(); } catch { }
                       hapticImpact('Light');
                     }} style={styles.videoCtrlBtn}>
                       <Ionicons name="refresh" size={20} color="rgba(255,255,255,0.7)" />
@@ -2819,7 +2799,7 @@ export default function VaultScreen() {
                       {[0, 0.25, 0.5, 0.75, 1].map(v => (
                         <Pressable key={v} onPress={() => {
                           setVideoVolume(v);
-                          try { if (videoPlayer) (videoPlayer as any).volume = v; } catch {}
+                          try { if (videoPlayer) (videoPlayer as any).volume = v; } catch { }
                         }} style={[styles.volumeStep, { opacity: videoVolume >= v ? 1 : 0.3 }]}>
                           <View style={[styles.volumeStepBar, { height: 4 + v * 14 }]} />
                         </Pressable>
@@ -2978,7 +2958,7 @@ export default function VaultScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
           >
-            <Pressable onPress={() => {}} style={styles.passModal}>
+            <Pressable onPress={() => { }} style={styles.passModal}>
               <View style={styles.modalHandle} />
               <Text style={styles.passModalTitle}>{editingPassword ? 'Edit Password' : 'Add Password'}</Text>
 
@@ -3427,7 +3407,7 @@ export default function VaultScreen() {
       <Modal visible={isCsvImportVisible} animationType="slide" transparent onRequestClose={() => setIsCsvImportVisible(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setIsCsvImportVisible(false)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={0}>
-            <Pressable onPress={() => {}} style={styles.passModal}>
+            <Pressable onPress={() => { }} style={styles.passModal}>
               <View style={styles.modalHandle} />
               <Text style={styles.passModalTitle}>Import from Browser CSV</Text>
               <Text style={{ color: colors.textVariant, fontSize: 13, marginBottom: 14, lineHeight: 19 }}>

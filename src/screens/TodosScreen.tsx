@@ -17,7 +17,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation, NavigationProp } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -78,6 +78,8 @@ interface Todo {
   subtasks: Subtask[];
   createdAt: number;
   completedAt?: number;
+  expectedMinutes?: number;
+  timeSpentSeconds?: number;
 }
 
 // ─── AsyncStorage ─────────────────────────────────────────────────────────────
@@ -163,6 +165,7 @@ const TodoItem = React.memo(({
   const pressAnim = useRef(new Animated.Value(1)).current;
   const sparkAnim = useRef(new Animated.Value(0)).current;
   const swipeRef = useRef<Swipeable>(null);
+  const navigation = useNavigation<NavigationProp<any>>();
 
   useEffect(() => {
     Animated.spring(checkAnim, {
@@ -267,13 +270,34 @@ const TodoItem = React.memo(({
             </Pressable>
 
             <View style={iStyles.body}>
-              <Text numberOfLines={2} style={[
-                iStyles.text, { color: item.completed ? colors.textVariant : colors.text },
-                item.completed && iStyles.textDone,
-                isShopping && { fontSize: scaleFontSize(16), fontWeight: '600' }
-              ]}>
-                {item.text}
-              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Text numberOfLines={2} style={[
+                  iStyles.text, { color: item.completed ? colors.textVariant : colors.text, flex: 1, paddingRight: 8 },
+                  item.completed && iStyles.textDone,
+                  isShopping && { fontSize: scaleFontSize(16), fontWeight: '600' }
+                ]}>
+                  {item.text}
+                </Text>
+                
+                {item.expectedMinutes && !item.completed ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      navigation.navigate('Focus', {
+                        linkedTask: { 
+                          id: item.id, type: 'todo', name: item.text, 
+                          expectedMinutes: item.expectedMinutes, 
+                          timeSpentSeconds: item.timeSpentSeconds || 0 
+                        } 
+                      });
+                    }}
+                    style={{ padding: 2, marginRight: 24, marginTop: -2 }}
+                    hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                  >
+                    <Ionicons name="play-circle" size={24} color={colors.primary} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
               {!isShopping && (
                 <View style={iStyles.meta}>
@@ -427,13 +451,16 @@ interface ModalProps {
 function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNext, onSaveMultiple, colors, isDark }: ModalProps) {
   const isEdit = !!initial;
   const [text, setText] = useState('');
-  const [priority, setPriority] = useState<Priority>('med');
+  const [priority, setPriority] = useState<Priority>('low');
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [tag, setTag] = useState<Tag | undefined>(initialTag);
   const [showPicker, setShowPicker] = useState(false);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subInput, setSubInput] = useState('');
   const [notes, setNotes] = useState('');
+  const [todoExpHours, setTodoExpHours] = useState('');
+  const [todoExpMinutes, setTodoExpMinutes] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const slideAnim = useRef(new Animated.Value(600)).current;
   const inputRef = useRef<TextInput>(null);
 
@@ -444,12 +471,18 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
         setSubtasks(initial.subtasks || []);
         setTag(initial.tag);
         setNotes(initial.notes ?? '');
+        setTodoExpHours(initial.expectedMinutes ? String(Math.floor(initial.expectedMinutes / 60) || '') : '');
+        setTodoExpMinutes(initial.expectedMinutes ? String(initial.expectedMinutes % 60 || '') : '');
         setDueDate(initial.dueDate ? new Date(initial.dueDate) : undefined);
+        setShowAdvanced(!!(initial.notes || initial.expectedMinutes || initial.dueDate || initial.subtasks?.length || initial.tag));
       } else {
-        setText(''); setPriority('med');
+        setText(''); setPriority('low');
         setTag(initialTag);
         setNotes('');
+        setTodoExpHours('');
+        setTodoExpMinutes('');
         setDueDate(undefined); setSubtasks([]);
+        setShowAdvanced(false);
       }
       Animated.spring(slideAnim, { toValue: 0, tension: 120, friction: 12, velocity: 1.5, useNativeDriver: true }).start();
     } else {
@@ -457,13 +490,21 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
     }
   }, [visible, initial, initialTag]);
 
-  const build = (): Todo => ({
-    id: initial?.id ?? genId(),
-    text: text.trim(), completed: initial?.completed ?? false, archived: initial?.archived ?? false,
-    priority, dueDate: dueDate?.getTime(), tag,
-    notes: notes.trim() || undefined,
-    subtasks, createdAt: initial?.createdAt ?? Date.now(), completedAt: initial?.completedAt,
-  });
+  const build = (): Todo => {
+    let tMins = 0;
+    if (todoExpHours) tMins += parseInt(todoExpHours, 10) * 60;
+    if (todoExpMinutes) tMins += parseInt(todoExpMinutes, 10);
+    
+    return {
+      id: initial?.id ?? genId(),
+      text: text.trim(), completed: initial?.completed ?? false, archived: initial?.archived ?? false,
+      priority, dueDate: dueDate?.getTime(), tag,
+      notes: notes.trim() || undefined,
+      expectedMinutes: tMins > 0 ? tMins : undefined,
+      timeSpentSeconds: initial?.timeSpentSeconds ?? 0,
+      subtasks, createdAt: initial?.createdAt ?? Date.now(), completedAt: initial?.completedAt,
+    };
+  };
 
   const handleSaveItems = () => {
     if (!text.trim()) return;
@@ -563,8 +604,22 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
                   })}
                 </View>
 
-                {/* Tag */}
-                <Text style={[mStyles.lbl, { color: colors.textVariant }]}>TAG</Text>
+                {!showAdvanced ? (
+                  <TouchableOpacity 
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setShowAdvanced(true);
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: colors.background, borderRadius: 14, marginBottom: 20 }}
+                  >
+                    <Ionicons name="options-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
+                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: scaleFontSize(13) }}>Show More Options</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <>
+                    {/* Tag */}
+                    <Text style={[mStyles.lbl, { color: colors.textVariant }]}>TAG</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
                   {ALL_TAGS.filter(t => t !== 'Shopping').map(t => {
                     const active = tag === t;
@@ -593,6 +648,27 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
                   value={notes}
                   onChangeText={setNotes}
                 />
+
+                {/* Expected Time */}
+                <Text style={[mStyles.lbl, { color: colors.textVariant }]}>EXPECTED DURATION (OPTIONAL)</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 18 }}>
+                  <TextInput
+                    style={[{ flex: 1, borderRadius: 14, padding: 14, fontSize: 13, backgroundColor: colors.background, color: colors.text }]}
+                    placeholder="Hours"
+                    placeholderTextColor={colors.textVariant + '50'}
+                    keyboardType="number-pad"
+                    value={todoExpHours}
+                    onChangeText={setTodoExpHours}
+                  />
+                  <TextInput
+                    style={[{ flex: 1, borderRadius: 14, padding: 14, fontSize: 13, backgroundColor: colors.background, color: colors.text }]}
+                    placeholder="Minutes"
+                    placeholderTextColor={colors.textVariant + '50'}
+                    keyboardType="number-pad"
+                    value={todoExpMinutes}
+                    onChangeText={setTodoExpMinutes}
+                  />
+                </View>
 
                 {/* Due date */}
                 <Text style={[mStyles.lbl, { color: colors.textVariant }]}>DUE DATE</Text>
@@ -640,6 +716,8 @@ function TodoModal({ visible, initial, initialTag, onClose, onSave, onSaveAndNex
                     <Ionicons name="add" size={20} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
+                  </>
+                )}
               </>
             )}
 
@@ -898,35 +976,57 @@ export default function TodosScreen() {
   const done = useMemo(() => filtered.filter(t => t.completed), [filtered]);
 
   const listData = useMemo(() => {
-    const activeItems = filtered.filter(t => !t.completed);
-    const doneItems = filtered.filter(t => t.completed);
+    const activeItems = filtered.filter(t => !t.completed && t.tag !== 'Shopping');
+    const doneItems = filtered.filter(t => t.completed && t.tag !== 'Shopping');
+    const activeGrocery = filtered.filter(t => !t.completed && t.tag === 'Shopping');
+    const doneGrocery = filtered.filter(t => t.completed && t.tag === 'Shopping');
 
-    // 1. Group items by tag
+    // 1. Group items by Date
     const groups: Record<string, Todo[]> = {};
     activeItems.forEach(t => {
-      const tag = t.tag || 'Daily Tasks';
-      if (!groups[tag]) groups[tag] = [];
-      groups[tag].push(t);
+      let groupKey = 'TODAY';
+      if (t.dueDate) {
+         const d = new Date(t.dueDate);
+         const today = new Date();
+         if (d.toDateString() !== today.toDateString()) {
+           groupKey = d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase();
+         }
+      }
+      if (!groups[groupKey]) groups[groupKey] = [];
+      groups[groupKey].push(t);
+    });
+
+    // Sort items within each group by priority
+    const priorityWeight: Record<Priority, number> = { high: 3, med: 2, low: 1 };
+    Object.keys(groups).forEach(k => {
+      groups[k].sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]);
     });
 
     // 2. Build the list with headers
-    let result: (Todo | { isHeader: boolean; title: string })[] = [];
+    let result: any[] = [];
 
-    // Shopping first
-    const sortedTags = Object.keys(groups).sort((a, b) => {
-      if (a === 'Shopping') return -1;
-      if (b === 'Shopping') return 1;
-      return a.localeCompare(b);
+    // 'TODAY' goes first, then sorted by date ascending
+    const sortedDates = Object.keys(groups).sort((a, b) => {
+      if (a === 'TODAY') return -1;
+      if (b === 'TODAY') return 1;
+      return new Date(groups[a][0].dueDate!).getTime() - new Date(groups[b][0].dueDate!).getTime();
     });
 
-    sortedTags.forEach(tag => {
-      result.push({ isHeader: true, title: tag.toUpperCase() });
-      result.push(...groups[tag]);
+    sortedDates.forEach(k => {
+      result.push({ isHeader: true, title: k });
+      result.push(...groups[k]);
     });
+
+    if (activeGrocery.length > 0) {
+      result.push({ isGroceryCard: true, items: activeGrocery });
+    }
 
     // 3. Completed at end
-    if (doneItems.length > 0) {
+    if (doneItems.length > 0 || doneGrocery.length > 0) {
       result.push({ isHeader: true, title: 'COMPLETED' });
+      if (doneGrocery.length > 0) {
+        result.push({ isGroceryCard: true, items: doneGrocery, isCompletedGroup: true });
+      }
       result.push(...doneItems);
     }
     return result;
@@ -1087,16 +1187,35 @@ export default function TodosScreen() {
             </>
           }
           renderItem={({ item, index }) => {
-            const isFirstDone = item.completed && (index === 0 || !listData[index - 1]?.completed);
+            if (item.isHeader) {
+               return <Text style={[s.secLbl, { color: colors.textVariant, marginTop: index > 0 ? 12 : 0 }]}>{item.title}</Text>;
+            }
+            if (item.isGroceryCard) {
+               return (
+                 <View style={{ backgroundColor: item.isCompletedGroup ? colors.surface + '88' : colors.surface, borderRadius: 24, padding: 18, marginBottom: 16, marginTop: 6, ...Shadows.soft }}>
+                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                     <Ionicons name="cart" size={20} color={colors.secondary || '#FFA93A'} style={{ marginRight: 8 }} />
+                     <Text style={{ ...Typography.header, fontSize: scaleFontSize(16), color: item.isCompletedGroup ? colors.textVariant : colors.text }}>Grocery List</Text>
+                   </View>
+                   {item.items.map((gItem: Todo, gIndex: number) => (
+                     <TodoItem key={gItem.id} item={gItem} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo}
+                       onEdit={t => { setEditingTodo(t); setModalOpen(true); }}
+                       onArchive={archiveTodo} colors={colors} isDark={isDark} index={gIndex} entryAnim={entryAnim} isCardChild={true} />
+                   ))}
+                   {!item.isCompletedGroup && (
+                     <TouchableOpacity onPress={() => openAction('Shopping')} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 4 }}>
+                       <Ionicons name="add" size={18} color={colors.primary} />
+                       <Text style={{ color: colors.primary, fontWeight: '700', marginLeft: 6 }}>Add Item</Text>
+                     </TouchableOpacity>
+                   )}
+                 </View>
+               );
+            }
+
             return (
-              <>
-                {isFirstDone && done.length > 0 && (
-                  <Text style={[s.secLbl, { color: colors.textVariant, marginTop: 10 }]}>COMPLETED · {done.length}</Text>
-                )}
-                <TodoItem item={item} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo}
-                  onEdit={t => { setEditingTodo(t); setModalOpen(true); }}
-                  onArchive={archiveTodo} colors={colors} isDark={isDark} index={index} entryAnim={entryAnim} />
-              </>
+              <TodoItem item={item} onToggle={toggleTodo} onToggleSubtask={toggleSubtask} onDelete={deleteTodo}
+                onEdit={t => { setEditingTodo(t); setModalOpen(true); }}
+                onArchive={archiveTodo} colors={colors} isDark={isDark} index={index} entryAnim={entryAnim} />
             );
           }}
           ListEmptyComponent={
@@ -1275,7 +1394,7 @@ const s = StyleSheet.create({
   fabAlways: { width: 58, height: 58, borderRadius: 29, overflow: 'hidden', ...Shadows.strong },
   fabAlwaysGrad: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  toastWrap: { position: 'absolute', bottom: 160, left: 0, right: 0 },
+  toastWrap: { position: 'absolute', bottom: 100, left: 0, right: 0 },
 
   archOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   archSheet: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 22, maxHeight: '72%' },

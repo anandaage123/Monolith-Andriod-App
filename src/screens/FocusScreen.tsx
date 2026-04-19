@@ -16,9 +16,10 @@ import {
   Modal,
   AppState
 } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useKeepAwake } from 'expo-keep-awake';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
@@ -26,7 +27,16 @@ import { Typography, Shadows } from '../theme/Theme';
 import { scaleFontSize } from '../utils/ResponsiveSize';
 import { useTheme } from '../context/ThemeContext';
 import { useAudioPlayer } from 'expo-audio';
-import { recordFocusSession } from '../services/DailyLogService';
+import { recordFocusSession, recordHabitCompleted, recordTodoCompleted } from '../services/DailyLogService';
+
+// ─── Task Selection Types ──────────────────────────────────────────────────
+interface LinkedTask {
+  id: string;
+  type: 'habit' | 'todo';
+  name: string;
+  expectedMinutes?: number;
+  timeSpentSeconds: number;
+}
 
 const { width, height } = Dimensions.get('window');
 const ds = (size: number) => (size * width) / 414;
@@ -856,18 +866,22 @@ const CelebrationOverlay: React.FC<{
 export default function FocusScreen() {
   const { colors, isDark } = useTheme();
 
-  useEffect(() => {
-    activateKeepAwakeAsync().catch(() => { });
-    return () => {
-      deactivateKeepAwake();
-    };
-  }, []);
+  useKeepAwake();
 
   // ─── State ──────────────────────────────────────────────────────────────────
   const [status, setStatus] = useState<TimerStatus>('setup');
   const [activeModeIdx, setActiveModeIdx] = useState(0);
   const [sessionName, setSessionName] = useState('');
   const [sessionTag, setSessionTag] = useState('Work');
+  const [linkedTask, setLinkedTask] = useState<LinkedTask | null>(null);
+
+  const route = useRoute<any>();
+
+  useEffect(() => {
+    if (route.params?.linkedTask) {
+      setLinkedTask(route.params.linkedTask);
+    }
+  }, [route.params?.linkedTask]);
 
   const [customFocus, setCustomFocus] = useState({ m: 25, s: 0 });
   const [customBreak, setCustomBreak] = useState({ m: 5, s: 0 });
@@ -898,6 +912,8 @@ export default function FocusScreen() {
   const [validationMessage, setValidationMessage] = useState({ title: '', message: '' });
   const [focusPickerVisible, setFocusPickerVisible] = useState(false);
   const [breakPickerVisible, setBreakPickerVisible] = useState(false);
+  const [taskSelectorVisible, setTaskSelectorVisible] = useState(false);
+  const [availableTasks, setAvailableTasks] = useState<LinkedTask[]>([]);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -1032,7 +1048,56 @@ export default function FocusScreen() {
     try {
       await AsyncStorage.setItem('@focus_logs_v3', JSON.stringify(updated));
     } catch { }
-  }, [status, sessionName, sessionTag, totalTime, timeLeft, mode.id, completedSprints, logs, isZenMode]);
+
+    if (linkedTask) {
+      updateTaskProgress(linkedTask.id, linkedTask.type, elapsedSecs);
+      setLinkedTask(prev => prev ? { ...prev, timeSpentSeconds: prev.timeSpentSeconds + elapsedSecs } : prev);
+    }
+  }, [status, sessionName, sessionTag, totalTime, timeLeft, mode.id, completedSprints, logs, isZenMode, linkedTask]);
+
+  const updateTaskProgress = async (id: string, type: 'habit' | 'todo', addedSeconds: number) => {
+    try {
+      if (type === 'habit') {
+        const d = await AsyncStorage.getItem('@habits_v3');
+        if (!d) return;
+        const arr = JSON.parse(d).map((h: any) => {
+          if (h.id === id) {
+            const spent = (h.timeSpentSeconds || 0) + addedSeconds;
+            const exp = (h.expectedMinutes || 0) * 60;
+            let comp = h.completed;
+            let count = h.count || 0;
+            let last = h.lastCompletedDate;
+            if (!comp && exp > 0 && spent >= exp) {
+              comp = true;
+              count += 1;
+              last = new Date().toISOString().split('T')[0];
+              recordHabitCompleted({ habitId: h.id, name: h.name, completedAt: Date.now(), streak: count }).catch(()=>{});
+            }
+            return { ...h, timeSpentSeconds: spent, completed: comp, count, lastCompletedDate: last };
+          }
+          return h;
+        });
+        await AsyncStorage.setItem('@habits_v3', JSON.stringify(arr));
+      } else {
+        const d = await AsyncStorage.getItem('@todos_v3');
+        if (!d) return;
+        const arr = JSON.parse(d).map((t: any) => {
+          if (t.id === id) {
+            const spent = (t.timeSpentSeconds || 0) + addedSeconds;
+            let comp = t.completed;
+            if (!comp && addedSeconds > 0) {
+              comp = true;
+              t.completedAt = Date.now();
+              recordTodoCompleted({ todoId: t.id, text: t.text, completedAt: t.completedAt }).catch(()=>{});
+            }
+            return { ...t, timeSpentSeconds: spent, completed: comp };
+          }
+          return t;
+        });
+        await AsyncStorage.setItem('@todos_v3', JSON.stringify(arr));
+      }
+    } catch {}
+  };
 
   // ─── Haptic ───────────────────────────────────────────────────────────────────
   const triggerHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Medium) => {
@@ -1196,7 +1261,7 @@ export default function FocusScreen() {
       recordFocusSession({
         startTs: sessionStartTime,
         endTs,
-        title: sessionName || (isZenMode ? 'Zen Flow' : 'Focus Session'),
+        title: linkedTask ? linkedTask.name : (sessionName || (isZenMode ? 'Zen Flow' : 'Focus Session')),
         tag: sessionTag,
         mode: mode.id,
       }).catch(() => { });
@@ -1211,11 +1276,20 @@ export default function FocusScreen() {
   const doExitSession = () => {
     const endTs = Date.now();
     const elapsedMin = sessionStartTime > 0 ? Math.round((endTs - sessionStartTime) / 60000) : 0;
+    
+    if (status === 'focus' && linkedTask) {
+      const currentSprintSecs = totalTime > timeLeft ? totalTime - timeLeft : 0;
+      if (currentSprintSecs > 0) {
+        updateTaskProgress(linkedTask.id, linkedTask.type, currentSprintSecs);
+        setLinkedTask(prev => prev ? { ...prev, timeSpentSeconds: prev.timeSpentSeconds + currentSprintSecs } : prev);
+      }
+    }
+
     if (sessionStartTime > 0 && elapsedMin >= 1) {
       recordFocusSession({
         startTs: sessionStartTime,
         endTs,
-        title: sessionName || (isZenMode ? 'Zen Flow' : 'Focus Session'),
+        title: linkedTask ? linkedTask.name : (sessionName || (isZenMode ? 'Zen Flow' : 'Focus Session')),
         tag: sessionTag,
         mode: mode.id,
       }).catch(() => { });
@@ -1740,8 +1814,8 @@ export default function FocusScreen() {
                       key={d}
                       style={[s.zenChip, zenDuration === d && s.zenChipActive]}
                       onPress={() => {
-                        setZenDuration(d);
-                        triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                         setZenDuration(d);
+                         triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
                       }}
                     >
                       <Text
@@ -1767,6 +1841,69 @@ export default function FocusScreen() {
                     Breathe in · hold · breathe out. Let the timer guide you.
                   </Text>
                 </View>
+              </View>
+            )}
+
+            {/* Linked Task selector */}
+            {!isZenMode && (
+              <View style={{ marginTop: ds(16) }}>
+                <Text style={[s.label, { marginBottom: ds(10) }]}>Linked Task (Optional)</Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: linkedTask ? modeColor + '12' : colors.surface,
+                    borderWidth: 1.5,
+                    borderColor: linkedTask ? modeColor : 'transparent',
+                    borderRadius: ds(16),
+                    padding: ds(14),
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                  }}
+                  onPress={() => {
+                    setTaskSelectorVisible(true);
+                    triggerHaptic();
+                    // Load tasks
+                    (async () => {
+                      try {
+                        const arr: LinkedTask[] = [];
+                        const [hData, tData] = await Promise.all([
+                          AsyncStorage.getItem('@habits_v3'),
+                          AsyncStorage.getItem('@todos_v3')
+                        ]);
+                        if (hData) {
+                          JSON.parse(hData).filter((x: any) => !x.completed).forEach((x: any) => {
+                            arr.push({ id: x.id, type: 'habit', name: x.name, expectedMinutes: x.expectedMinutes, timeSpentSeconds: x.timeSpentSeconds || 0 });
+                          });
+                        }
+                        if (tData) {
+                          JSON.parse(tData).filter((x: any) => !x.completed && !x.archived && x.tag !== 'Shopping').forEach((x: any) => {
+                            arr.push({ id: x.id, type: 'todo', name: x.text, expectedMinutes: x.expectedMinutes, timeSpentSeconds: x.timeSpentSeconds || 0 });
+                          });
+                        }
+                        setAvailableTasks(arr);
+                      } catch {}
+                    })();
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: ds(10), flex: 1 }}>
+                    <Ionicons name={linkedTask ? "link" : "add-circle-outline"} size={ds(20)} color={linkedTask ? modeColor : colors.textVariant} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: ds(14), fontWeight: '700', color: linkedTask ? modeColor : colors.text }}>
+                        {linkedTask ? linkedTask.name : "Select a Ritual or Task"}
+                      </Text>
+                      {linkedTask && linkedTask.expectedMinutes ? (
+                        <Text style={{ fontSize: ds(11), color: colors.textVariant, marginTop: ds(2) }}>
+                          Expected: {linkedTask.expectedMinutes}m • Spent: {Math.max(0, Math.floor(linkedTask.timeSpentSeconds / 60))}m
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  {linkedTask && (
+                    <TouchableOpacity onPress={() => { triggerHaptic(); setLinkedTask(null); }} style={{ padding: ds(6) }}>
+                      <Ionicons name="close-circle" size={ds(20)} color={colors.textVariant} />
+                    </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
               </View>
             )}
 
@@ -2352,6 +2489,61 @@ export default function FocusScreen() {
           },
         ]}
       />
+
+      {/* Task Selector Modal */}
+      <Modal visible={taskSelectorVisible} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: colors.background, borderTopLeftRadius: ds(24), borderTopRightRadius: ds(24), padding: ds(20), maxHeight: height * 0.7 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: ds(16) }}>
+              <Text style={{ fontSize: ds(20), fontWeight: '800', color: colors.text }}>Select a Task</Text>
+              <TouchableOpacity onPress={() => setTaskSelectorVisible(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                <Ionicons name="close" size={ds(24)} color={colors.textVariant} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: ds(40) }}>
+              {availableTasks.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: colors.textVariant, marginTop: ds(30) }}>
+                  No active rituals or tasks available.
+                </Text>
+              ) : (
+                availableTasks.map((t) => (
+                  <TouchableOpacity
+                    key={t.id + t.type}
+                    style={{
+                      padding: ds(16),
+                      backgroundColor: colors.surface,
+                      borderRadius: ds(16),
+                      marginBottom: ds(10),
+                      borderWidth: 1.5,
+                      borderColor: linkedTask?.id === t.id ? modeColor : 'transparent'
+                    }}
+                    onPress={() => {
+                      triggerHaptic();
+                      setLinkedTask(t);
+                      setTaskSelectorVisible(false);
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: ds(10) }}>
+                      <Ionicons
+                        name={t.type === 'habit' ? 'repeat-outline' : 'checkbox-outline'}
+                        size={ds(20)}
+                        color={t.type === 'habit' ? '#FF9F0A' : '#30D158'}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: ds(16), fontWeight: '600', color: colors.text }}>{t.name}</Text>
+                        <Text style={{ fontSize: ds(12), color: colors.textVariant }}>
+                          {t.type === 'habit' ? 'Daily Ritual' : 'Todo Task'}
+                          {t.expectedMinutes ? ` • Goal: ${t.expectedMinutes}m` : ''}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
