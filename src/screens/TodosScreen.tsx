@@ -102,7 +102,7 @@ async function loadTodosFromStorage(): Promise<Todo[]> {
 async function saveTodosToStorage(todos: Todo[]): Promise<void> {
   try {
     await AsyncStorage.setItem(TODOS_KEY, JSON.stringify(todos));
-    const formatTasks = (ts: any[]) => ts.filter(t => !t.archived && t.tag !== 'Shopping').map(t => ({ id: t.id, title: t.text, completed: t.completed }));
+    const formatTasks = (ts: any[]) => ts.filter(t => !t.archived && t.tag !== 'Shopping').map(t => ({ id: t.id, title: t.text, completed: t.completed, priority: t.priority, subtasks: t.subtasks }));
     broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(todos) });
   } catch (e) {
     console.error('Save todos error:', e);

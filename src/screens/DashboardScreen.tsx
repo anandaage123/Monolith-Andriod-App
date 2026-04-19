@@ -418,7 +418,7 @@ export default function DashboardScreen() {
       try {
         const rawTodos = await AsyncStorage.getItem('@todos_v3');
         let tasks = rawTodos ? JSON.parse(rawTodos) : [];
-        const formatTasks = (ts: any[]) => ts.filter(t => !t.archived && t.tag !== 'Shopping').map(t => ({ id: t.id, title: t.text, completed: t.completed, priority: t.priority }));
+        const formatTasks = (ts: any[]) => ts.filter(t => !t.archived && t.tag !== 'Shopping').map(t => ({ id: t.id, title: t.text, completed: t.completed, priority: t.priority, subtasks: t.subtasks }));
 
         const rawNotes = await AsyncStorage.getItem('@daily_notes_v3');
         let notes = rawNotes ? JSON.parse(rawNotes) : [];
@@ -433,7 +433,9 @@ export default function DashboardScreen() {
             timer: { isRunning: false, timeRemaining: 1500, mode: 'FOCUS' },
             tasks: formatTasks(tasks),
             notes: formatNotes(notes),
-            habits: currentHabits
+            habits: currentHabits,
+            weather: weather,
+            quote: quote
           });
         }
         else if (type === 'HABIT_TOGGLE') {
@@ -508,6 +510,11 @@ export default function DashboardScreen() {
     broadcastSyncUpdate('REQUEST_FULL_STATE', {}); // optional
     setSyncModalVisible(false);
     setTempSyncCode('');
+  };
+
+  const forceRefresh = async () => {
+    broadcastSyncUpdate('REQUEST_FULL_STATE', {}); // Ping yourself to broadcast everything
+    setSyncModalVisible(false);
   };
 
   const attemptDisconnect = async () => {
@@ -756,7 +763,9 @@ export default function DashboardScreen() {
       return { ...h, completed: !h.completed };
     });
     setHabits(updated);
-    AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+    AsyncStorage.setItem('@habits_v3', JSON.stringify(updated)).then(() => {
+      broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
+    });
   };
 
   const deleteHabit = (id: string) => {
@@ -764,7 +773,9 @@ export default function DashboardScreen() {
     Animated.timing(habitDeleteAnim, { toValue: 0, duration: 260, useNativeDriver: true }).start(() => {
       const updated = habits.filter(h => h.id !== id);
       setHabits(updated);
-      AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+      AsyncStorage.setItem('@habits_v3', JSON.stringify(updated)).then(() => {
+         broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
+      });
       setDeleteConfirmVisible(false);
       setHabitToDelete(null);
       habitDeleteAnim.setValue(1);
@@ -806,7 +817,9 @@ export default function DashboardScreen() {
       updated = [...habits, newHabit];
     }
     setHabits(updated);
-    AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+    AsyncStorage.setItem('@habits_v3', JSON.stringify(updated)).then(() => {
+        broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
+    });
     setNewHabitName('');
     setHabitExpHours('');
     setHabitExpMinutes('');
@@ -1514,6 +1527,9 @@ export default function DashboardScreen() {
                   <Text style={{ fontSize: scaleFontSize(36), fontWeight: '900', letterSpacing: 6, color: colors.primary }}>{syncCode}</Text>
                   <Text style={{ fontSize: scaleFontSize(13), color: colors.primary, marginTop: 12, opacity: 0.8 }}>Data successfully synced with Web.</Text>
                 </View>
+                <Pressable style={({ pressed }) => [{ backgroundColor: 'rgba(64, 82, 182, 0.1)', borderWidth: 1, borderColor: colors.primary, borderRadius: 16, padding: 18, alignItems: 'center' }, { opacity: pressed ? 0.8 : 1 }]} onPress={forceRefresh}>
+                  <Text style={{ color: colors.primary, fontWeight: '800', fontSize: scaleFontSize(16), letterSpacing: 0.5 }}>Force Re-Sync / Refresh</Text>
+                </Pressable>
                 <Pressable style={({ pressed }) => [{ backgroundColor: 'rgba(255, 107, 107, 0.1)', borderWidth: 1, borderColor: '#FF6B6B', marginTop: 8, borderRadius: 16, padding: 18, alignItems: 'center' }, { opacity: pressed ? 0.8 : 1 }]} onPress={attemptDisconnect}>
                   <Text style={{ color: '#FF6B6B', fontWeight: '800', fontSize: scaleFontSize(16), letterSpacing: 0.5 }}>Unlink Session</Text>
                 </Pressable>

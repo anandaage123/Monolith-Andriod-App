@@ -191,6 +191,15 @@ function handleRemoteEvent(type, payload) {
             if (payload.greeting) document.getElementById('greeting-text').innerText = payload.greeting;
             if (payload.notes) syncNotes(payload.notes);
             if (payload.habits) syncHabits(payload.habits);
+            if (payload.weather) {
+                document.getElementById('weather-temp').innerText = `${payload.weather.temperature || '--'}°`;
+                document.getElementById('weather-icon').innerText = payload.weather.conditionIcon || '☁️';
+                document.getElementById('weather-desc').innerText = payload.weather.city || 'Local Weather';
+            }
+            if (payload.quote) {
+                document.getElementById('quote-text').innerText = `"${payload.quote.text}"`;
+                document.getElementById('quote-author').innerText = `— ${payload.quote.author}`;
+            }
             break;
             
         case 'TIMER_STATE_UPDATE':
@@ -283,10 +292,15 @@ function renderTasks() {
         if (task.priority === 'low') priorityColor = 'var(--success)';
         if (task.priority === 'med') priorityColor = 'var(--primary)';
         
+        const subtaskHTML = (task.subtasks || []).map(st => 
+            `<span class="subtask-pill" style="text-decoration: ${st.completed ? 'line-through' : 'none'}; opacity: ${st.completed ? '0.5' : '1'}">${st.title}</span>`
+        ).join('');
+
         li.innerHTML = `
             <div class="task-checkbox"></div>
             <div class="task-content">
                 <span>${task.title}</span>
+                <div style="margin-top: 4px;">${subtaskHTML}</div>
                 <span style="display: block; font-size: 12px; color: ${priorityColor}; text-transform: uppercase; margin-top: 4px; font-weight: 600;">${task.priority || 'MED'}</span>
             </div>
             <button class="delete-btn" style="background: none; border: none; color: var(--danger); cursor: pointer; padding: 8px;">✕</button>
@@ -329,21 +343,29 @@ function renderNotes() {
         return;
     }
 
+    let index = 0;
     notes.forEach(note => {
         const div = document.createElement('div');
-        div.className = 'bento-box';
-        div.style.background = 'rgba(255, 255, 255, 0.03)';
-        div.style.border = '1px solid rgba(255, 255, 255, 0.05)';
+        
+        // Determine Bento class based on index modulo 6
+        let bentoClass = 'j-row-2-eq';
+        const mod = index % 6;
+        if (mod === 0) bentoClass = 'j-row-1-wide';
+        else if (mod === 1) bentoClass = 'j-row-1-narrow';
+        else if (mod === 5) bentoClass = 'j-row-3-full';
+
+        div.className = `journal-bento ${bentoClass}`;
         
         // Truncate content to keep UI clean
-        const contentPreview = note.content ? (note.content.length > 150 ? note.content.substring(0, 150) + '...' : note.content) : '';
+        const contentPreview = note.content ? (note.content.length > 200 ? note.content.substring(0, 200) + '...' : note.content) : '';
         
         div.innerHTML = `
             <h4 style="margin: 0 0 0.5rem 0; font-size: 1.1rem; color: #fff;">${note.title || 'Entry'}</h4>
             <span style="font-size: 0.8rem; color: #8899FF; display: block; margin-bottom: 1rem;">${new Date(note.date).toLocaleDateString()}</span>
-            <div style="font-size: 0.95rem; line-height: 1.5; color: #a0a0B0; white-space: pre-wrap;">${contentPreview}</div>
+            <div style="font-size: 0.95rem; line-height: 1.5; color: #a0a0B0; white-space: pre-wrap; flex: 1;">${contentPreview}</div>
         `;
         journalList.appendChild(div);
+        index++;
     });
 }
 

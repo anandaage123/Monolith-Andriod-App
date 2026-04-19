@@ -52,18 +52,30 @@
                 </header>
                 
                 <div class="bento-grid">
-                    <div class="bento-box greeting-box">
+                    <div class="bento-box greeting-box" style="grid-column: span 2;">
                         <h3 id="greeting-text">Good afternoon.</h3>
-                        <p id="focus-summary">Let's dominate the day.</p>
+                        <p id="focus-summary" style="margin-bottom: 24px;">Let's dominate the day.</p>
+                        <div id="weather-widget" style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.05); padding: 12px; border-radius: 12px;">
+                            <span id="weather-icon" style="font-size: 24px;">☁️</span>
+                            <div>
+                                <h4 id="weather-temp" style="margin: 0; font-size: 16px;">--°</h4>
+                                <span id="weather-desc" style="font-size: 12px; color: var(--text-muted);">Loading weather...</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="bento-box stats-box">
+                    <div class="bento-box stats-box" style="display: flex; flex-direction: column; justify-content: space-between;">
                         <h3>Active Tasks</h3>
                         <h1 id="task-count">0</h1>
                     </div>
-                    <div class="bento-box sync-box">
+                    <div class="bento-box sync-box" style="display: flex; flex-direction: column; justify-content: space-between;">
                         <h3>Connection</h3>
                         <p class="highlight" id="paired-code-display">SYNC-XXXXXX</p>
                     </div>
+                </div>
+
+                <div class="bento-box" id="quote-widget" style="margin-top: 20px; background: linear-gradient(135deg, var(--primary) 0%, #2A3686 100%);">
+                    <p id="quote-text" style="font-size: 18px; font-weight: 500; font-style: italic; color: #fff; margin-bottom: 8px;">"Crafting your morning inspiration..."</p>
+                    <span id="quote-author" style="font-size: 14px; color: rgba(255,255,255,0.7);">— Daily Hub</span>
                 </div>
 
                 <div style="margin-top: 40px;">
@@ -137,7 +149,7 @@
                     <button id="add-note-btn" class="primary-btn" style="margin-top: 12px; width: auto; padding: 12px 32px;">Commit Log</button>
                 </div>
 
-                <div id="journal-list" class="journal-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+                <div id="journal-list" class="journal-wrapper" style="margin-top: 1.5rem;">
                     <!-- Notes will be injected here via JS -->
                 </div>
             </section>
