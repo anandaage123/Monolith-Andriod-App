@@ -104,8 +104,39 @@ function init() {
             newTaskInput.value = '';
         }
     });
-    newTaskInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') addTaskBtn.click();
+    
+    document.getElementById('add-task-btn').addEventListener('click', () => {
+        const input = document.getElementById('new-task-input');
+        const prio = document.getElementById('new-task-priority');
+        const title = input.value.trim();
+        if (title) {
+            const task = { id: Date.now().toString(), title, completed: false, priority: prio.value };
+            addTaskLocally(task);
+            broadcastEvent('TASK_ADD', task);
+            input.value = '';
+        }
+    });
+
+    document.getElementById('add-note-btn').addEventListener('click', () => {
+        const titleInput = document.getElementById('new-note-title');
+        const contentInput = document.getElementById('new-note-content');
+        if (titleInput.value.trim() && contentInput.value.trim()) {
+            broadcastEvent('NOTE_ADD', { title: titleInput.value.trim(), content: contentInput.value.trim() });
+            titleInput.value = '';
+            contentInput.value = '';
+        }
+    });
+
+    // Budget Listeners
+    document.getElementById('add-expense-btn').addEventListener('click', () => {
+        // App side does not yet have EXPENSE_ADD handler implemented in Phase 1, but we can broadcast it for future.
+        const title = document.getElementById('new-expense-title').value.trim();
+        const amount = parseFloat(document.getElementById('new-expense-amount').value);
+        if (title && !isNaN(amount)) {
+            broadcastEvent('EXPENSE_ADD', { title, amount });
+            document.getElementById('new-expense-title').value = '';
+            document.getElementById('new-expense-amount').value = '';
+        }
     });
 }
 
@@ -171,6 +202,8 @@ function handleRemoteEvent(type, payload) {
             if (payload.timer) syncTimer(payload.timer);
             if (payload.greeting) document.getElementById('greeting-text').innerText = payload.greeting;
             if (payload.notes) syncNotes(payload.notes);
+            if (payload.habits) syncHabits(payload.habits);
+            if (payload.wallet) syncWallet(payload.wallet);
             break;
             
         case 'TIMER_STATE_UPDATE':
@@ -179,6 +212,14 @@ function handleRemoteEvent(type, payload) {
             
         case 'TASK_STATE_UPDATE':
             syncTasks(payload.tasks);
+            break;
+            
+        case 'HABIT_STATE_UPDATE':
+            syncHabits(payload.habits);
+            break;
+
+        case 'NOTE_STATE_UPDATE':
+            syncNotes(payload.notes);
             break;
     }
 }
@@ -250,16 +291,29 @@ function renderTasks() {
         const li = document.createElement('li');
         li.className = `task-item ${task.completed ? 'completed' : ''}`;
         
+        let priorityColor = 'var(--text-muted)';
+        if (task.priority === 'high') priorityColor = 'var(--danger)';
+        if (task.priority === 'low') priorityColor = 'var(--success)';
+        if (task.priority === 'med') priorityColor = 'var(--primary)';
+        
         li.innerHTML = `
             <div class="task-checkbox"></div>
             <div class="task-content">
                 <span>${task.title}</span>
+                <span style="display: block; font-size: 12px; color: ${priorityColor}; text-transform: uppercase; margin-top: 4px; font-weight: 600;">${task.priority || 'MED'}</span>
             </div>
+            <button class="delete-btn" style="background: none; border: none; color: var(--danger); cursor: pointer; padding: 8px;">✕</button>
         `;
         
         li.querySelector('.task-checkbox').addEventListener('click', () => {
             task.completed = !task.completed;
             broadcastEvent('TASK_TOGGLE', { id: task.id, completed: task.completed });
+            renderTasks();
+        });
+        
+        li.querySelector('.delete-btn').addEventListener('click', () => {
+            broadcastEvent('TASK_DELETE', { id: task.id });
+            tasks = tasks.filter(t => t.id !== task.id);
             renderTasks();
         });
         
@@ -299,9 +353,84 @@ function renderNotes() {
         
         div.innerHTML = `
             <h4 style="margin: 0 0 0.5rem 0; font-size: 1.1rem; color: #fff;">${note.title || 'Entry'}</h4>
-            <span style="font-size: 0.8rem; color: #8899FF; display: block; margin-bottom: 1rem;">${note.date || ''}</span>
+            <span style="font-size: 0.8rem; color: #8899FF; display: block; margin-bottom: 1rem;">${new Date(note.date).toLocaleDateString()}</span>
             <div style="font-size: 0.95rem; line-height: 1.5; color: #a0a0B0; white-space: pre-wrap;">${contentPreview}</div>
         `;
         journalList.appendChild(div);
     });
 }
+
+/* Rituals Logic */
+let habits = [];
+function syncHabits(newHabits) {
+    habits = newHabits || [];
+    renderHabits();
+}
+
+function renderHabits() {
+    const list = document.getElementById('rituals-list');
+    if (!list) return;
+    list.innerHTML = '';
+    
+    habits.forEach(h => {
+        const div = document.createElement('div');
+        div.className = `bento-box ${h.completed ? 'completed-habit' : ''}`;
+        div.style.cursor = 'pointer';
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column';
+        div.style.justifyContent = 'space-between';
+        if (h.completed) div.style.border = '1px solid var(--primary)';
+        
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 32px;">${h.icon || '✨'}</span>
+                <div style="width: 24px; height: 24px; border-radius: 50%; border: 2px solid ${h.completed ? 'var(--primary)' : 'var(--text-muted)'}; background: ${h.completed ? 'var(--primary)' : 'transparent'};"></div>
+            </div>
+            <div style="margin-top: 16px;">
+                <h3 style="color: #fff; margin-bottom: 4px;">${h.text}</h3>
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 600;">🔥 ${h.count || 0} STREAK</span>
+            </div>
+        `;
+        
+        div.addEventListener('click', () => {
+            h.completed = !h.completed;
+            broadcastEvent('HABIT_TOGGLE', { id: h.id, completed: h.completed });
+            renderHabits();
+        });
+        
+        list.appendChild(div);
+    });
+}
+
+/* Wallet Logic */
+function syncWallet(wallet) {
+    if (!wallet) return;
+    const balanceElem = document.getElementById('budget-balance');
+    const spentElem = document.getElementById('budget-spent-label');
+    const list = document.getElementById('expense-list');
+    
+    const available = wallet.limit - wallet.spent;
+    if (balanceElem) {
+        balanceElem.innerText = '$' + available.toLocaleString();
+        if (wallet.spent > wallet.limit * 0.9) balanceElem.style.color = 'var(--danger)';
+        else balanceElem.style.color = 'var(--success)';
+    }
+    if (spentElem) spentElem.innerText = `Spent: $${wallet.spent.toLocaleString()} / $${wallet.limit.toLocaleString()} limit`;
+    
+    if (list && wallet.transactions) {
+        list.innerHTML = '';
+        wallet.transactions.forEach(t => {
+            const li = document.createElement('li');
+            li.className = 'task-item';
+            li.innerHTML = `
+                <div class="task-content">
+                    <span style="font-weight: 600;">${t.title}</span>
+                    <span style="display: block; font-size: 12px; color: var(--text-muted); margin-top: 4px;">${new Date(t.date).toLocaleDateString()}</span>
+                </div>
+                <span style="color: var(--danger); font-weight: 700;">-$${t.amount}</span>
+            `;
+            list.appendChild(li);
+        });
+    }
+}
+

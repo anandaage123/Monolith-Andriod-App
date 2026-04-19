@@ -30,8 +30,9 @@
             <div class="brand">Monolith</div>
             <nav class="nav-menu" style="display: flex; flex-direction: column; height: 100%;">
                 <button class="nav-item active" data-target="dashboard">Dashboard</button>
-                <button class="nav-item" data-target="focus">Focus Timer</button>
                 <button class="nav-item" data-target="todos">Tasks</button>
+                <button class="nav-item" data-target="budget">Budget</button>
+                <button class="nav-item" data-target="focus">Focus Timer</button>
                 <button class="nav-item" data-target="journal">Journal</button>
                 
                 <div style="flex: 1; min-height: 20px;"></div>
@@ -63,6 +64,16 @@
                     <div class="bento-box sync-box">
                         <h3>Connection</h3>
                         <p class="highlight" id="paired-code-display">SYNC-XXXXXX</p>
+                    </div>
+                </div>
+
+                <div style="margin-top: 40px;">
+                    <header>
+                        <h2>Daily Rituals</h2>
+                        <p class="subtitle">Your synced habits and routines</p>
+                    </header>
+                    <div id="rituals-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+                        <!-- Rituals injected via JS -->
                     </div>
                 </div>
             </section>
@@ -101,11 +112,45 @@
                 
                 <div class="task-input-row">
                     <input type="text" id="new-task-input" placeholder="Add a new task..." />
+                    <select id="new-task-priority" class="secondary-btn" style="width: auto; padding: 0 16px;">
+                        <option value="high">High</option>
+                        <option value="med" selected>Medium</option>
+                        <option value="low">Low</option>
+                    </select>
                     <button id="add-task-btn" class="primary-btn">Add</button>
                 </div>
                 
                 <ul id="task-list" class="task-list">
                     <!-- Tasks will be injected here via JS -->
+                </ul>
+            </section>
+
+            <!-- Budget View -->
+            <section id="view-budget" class="view hidden">
+                <header>
+                    <h2>Daily Wallet</h2>
+                    <p class="subtitle">Live Ledger & Budget Health</p>
+                </header>
+
+                <div class="bento-grid" style="margin-bottom: 32px;">
+                    <div class="bento-box" style="flex: 1;">
+                        <h3>Available Balance</h3>
+                        <h1 id="budget-balance" style="color: var(--success);">$0</h1>
+                        <p id="budget-spent-label" style="color: var(--text-muted); margin-top: 8px;">Spent: $0 / $0 limit</p>
+                    </div>
+                </div>
+
+                <div class="task-input-row">
+                    <input type="text" id="new-expense-title" placeholder="What did you buy?" style="flex: 2;" />
+                    <input type="number" id="new-expense-amount" placeholder="$ Amount" style="flex: 1;" />
+                    <button id="add-expense-btn" class="primary-btn">Log</button>
+                </div>
+
+                <header style="margin-top: 32px; margin-bottom: 16px;">
+                    <h3>Recent Transactions</h3>
+                </header>
+                <ul id="expense-list" class="task-list">
+                    <!-- Expenses will be injected here via JS -->
                 </ul>
             </section>
 
@@ -116,6 +161,12 @@
                     <p class="subtitle">Your synced journal entries</p>
                 </header>
                 
+                <div style="margin-bottom: 24px; padding: 24px; background: rgba(255,255,255,0.02); border-radius: 20px; border: 1px solid var(--border);">
+                    <input type="text" id="new-note-title" placeholder="Entry Title..." style="width: 100%; margin-bottom: 12px; background: transparent; border: none; color: #fff; font-size: 18px; font-weight: 600; outline: none;" />
+                    <textarea id="new-note-content" placeholder="Write your thoughts..." style="width: 100%; min-height: 100px; background: transparent; border: none; color: var(--text-muted); font-size: 16px; outline: none; resize: vertical; line-height: 1.5;"></textarea>
+                    <button id="add-note-btn" class="primary-btn" style="margin-top: 12px; width: auto; padding: 12px 32px;">Commit Log</button>
+                </div>
+
                 <div id="journal-list" class="journal-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
                     <!-- Notes will be injected here via JS -->
                 </div>
@@ -123,6 +174,6 @@
         </main>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>
