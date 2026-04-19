@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.7.0 (2026-04-19)
+
+- refactor: update design system to premium linear-like aesthetic with Inter font and refined color palette
+- feat: enhance dashboard UI with ambient glow, backdrop blur, hover effects, and responsive desktop layouts
+- feat: implement WebSockets demo mode and optimize desktop UI responsiveness
+- refactor: redesign remote interface with new bento-grid layout and pairing screen
+- feat: analyze and replicate dashboard/journal bento layout to web, add subtasks and weather syncing, and implement force refresh connectivity button
+- fix: safeguard against undefined priority crashing the app
+- fix: remove non-existent budget code to match app
+- feat: complete V2 of web remote including Rituals, Wallet, Journal composing, and Task deletions
+- fix: wait for websocket to open before broadcasting initial state
+- fix: utilize new PieSocket personal cluster for stable syncing
+- feat: persist web UI connection via localStorage & unlink action
+- fix: cache busting for index.html
+- refactor: invert sync pairing flow to generate codes on web and connect via mobile modal
+- chore: Move web companion to /docs for native GitHub Pages hosting on master
+- feat: Instant reactive push syncing for Tasks and Notes, switched default branch to main
+- feat: Add Journal entries sync to Web Remote interface
+- fix: Switch WebSocket service from PieSocket to SocketsBay with custom channel payload due to connectivity issues
+- fix: Update WebSocket cluster URL and API key to resolve connection failure
+- feat: Add companion web remote and Dashboard interface integration
+- adds changlog file
+- refactor: improve swipeable interaction, update ritual deletion UI, and refine dynamic text coloring for dark mode
+
 ## Unreleased
 
 - **4feb9d5** (2026-04-19): refactor: improve swipeable interaction, update ritual deletion UI, and refine dynamic text coloring for dark mode
