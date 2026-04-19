@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.7.1 (2026-04-19)
+
+- refactor: simplify CSS variables and update font configuration in index.html
+- feat: implement dark-mode glassmorphism UI and PieSocket integration for Web Companion
+
 ## v3.7.0 (2026-04-19)
 
 - refactor: update design system to premium linear-like aesthetic with Inter font and refined color palette

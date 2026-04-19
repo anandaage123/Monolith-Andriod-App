@@ -1,11 +1,11 @@
 {
-  "version": "3.7.0",
-  "build": 55,
-  "versionCode": 55,
+  "version": "3.7.1",
+  "build": 56,
+  "versionCode": 56,
   "releaseDate": "2026-04-19",
-  "releaseNotes": "\u2022 refactor: update design system to premium linear-like aesthetic with Inter font and refined color palette\n\u2022 feat: enhance dashboard UI with ambient glow, backdrop blur, hover effects, and responsive desktop layouts\n\u2022 feat: implement WebSockets demo mode and optimize desktop UI responsiveness\n\u2022 refactor: redesign remote interface with new bento-grid layout and pairing screen\n\u2022 feat: analyze and replicate dashboard/journal bento layout to web, add subtasks and weather syncing, and implement force refresh connectivity button\n\u2022 fix: safeguard against undefined priority crashing the app\n\u2022 fix: remove non-existent budget code to match app\n\u2022 feat: complete V2 of web remote including Rituals, Wallet, Journal composing, and Task deletions\n\u2022 fix: wait for websocket to open before broadcasting initial state\n\u2022 fix: utilize new PieSocket personal cluster for stable syncing\n\u2022 feat: persist web UI connection via localStorage & unlink action\n\u2022 fix: cache busting for index.html\n\u2022 refactor: invert sync pairing flow to generate codes on web and connect via mobile modal\n\u2022 chore: Move web companion to /docs for native GitHub Pages hosting on master\n\u2022 feat: Instant reactive push syncing for Tasks and Notes, switched default branch to main\n\u2022 feat: Add Journal entries sync to Web Remote interface\n\u2022 fix: Switch WebSocket service from PieSocket to SocketsBay with custom channel payload due to connectivity issues\n\u2022 fix: Update WebSocket cluster URL and API key to resolve connection failure\n\u2022 feat: Add companion web remote and Dashboard interface integration\n\u2022 adds changlog file\n\u2022 refactor: improve swipeable interaction, update ritual deletion UI, and refine dynamic text coloring for dark mode",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.7.0/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.7.0",
+  "releaseNotes": "\u2022 refactor: simplify CSS variables and update font configuration in index.html\n\u2022 feat: implement dark-mode glassmorphism UI and PieSocket integration for Web Companion",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.7.1/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.7.1",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
