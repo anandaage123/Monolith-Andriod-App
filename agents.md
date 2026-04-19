@@ -81,6 +81,10 @@
     - **Budget Analytics**: Calculates real-time health. Percentages exceeding 90% of `currentLimit` trigger color shifts to `MM_Colors.error`.
 - **Month/Year Pivot**: Persistent state for time-traveling through past records with specific month/year budget overrides.
 
+### ◈ Web Companion (Monolith Remote)
+- **WebSockets Strategy**: Connects via a 6-character code. Fallback handles connection failures gracefully with a manual "Demo Mode" button, replacing legacy forced-fallback logic to avoid prematurely hiding the code.
+- **Desktop Grid Optimization**: Fluid responsive interfaces use smart CSS grid bento parameters (`max-width: 1400px`, dynamic gaps and paddings) to effortlessly expand across ultra-wide desktop monitors.
+
 ## 4. Engineering Standards & Guardrails
 - **Scroll Performance**: All root containers must use `flex: 1`. `ScrollView` must use `contentContainerStyle={{ flexGrow: 1 }}` to avoid layout clipping.
 - **Haptic Mapping**: 

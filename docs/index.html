@@ -68,43 +68,56 @@
           background: var(--surface);
           border: 1px solid var(--border2);
           border-radius: 28px;
-          padding: 48px 40px;
+          padding: 56px 48px;
           text-align: center;
           position: relative;
           overflow: hidden;
+          box-shadow: 0 24px 80px rgba(0,0,0,0.4);
         }
         .pair-card::before {
           content: '';
-          position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
-          width: 200px; height: 200px; border-radius: 50%;
+          position: absolute; top: -80px; left: 50%; transform: translateX(-50%);
+          width: 240px; height: 240px; border-radius: 50%;
           background: var(--accent-glow);
-          filter: blur(60px); pointer-events: none;
+          filter: blur(80px); pointer-events: none;
         }
         .pair-logo {
           font-family: var(--font-head);
-          font-size: 2.2rem; font-weight: 800;
+          font-size: 3rem; font-weight: 800;
           letter-spacing: -0.04em;
           background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
           -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          margin-bottom: 8px;
+          margin-bottom: 12px;
         }
-        .pair-subtitle { color: var(--muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 40px; }
+        .pair-subtitle { color: var(--muted); font-size: 0.95rem; line-height: 1.6; margin-bottom: 40px; }
         .sync-code-display {
           font-family: var(--font-mono);
-          font-size: 2.8rem; font-weight: 500;
-          letter-spacing: 12px;
+          font-size: 3.2rem; font-weight: 500;
+          letter-spacing: 14px;
           color: var(--accent);
           background: rgba(124,111,255,0.08);
           border: 1px solid rgba(124,111,255,0.2);
-          border-radius: 16px;
-          padding: 20px;
-          margin-bottom: 20px;
+          border-radius: 20px;
+          padding: 24px;
+          margin-bottom: 24px;
           user-select: all;
+          box-shadow: inset 0 0 20px rgba(0,0,0,0.2);
         }
         .pair-hint {
-          font-size: 0.82rem; color: var(--muted);
+          font-size: 0.88rem; color: var(--muted);
           display: flex; align-items: center; gap: 8px; justify-content: center;
         }
+        .demo-btn {
+          margin-top: 24px;
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          color: var(--text);
+          font-size: 0.85rem; font-weight: 600;
+          padding: 10px 20px;
+          border-radius: 12px;
+          transition: all 0.15s;
+        }
+        .demo-btn:hover { background: rgba(124,111,255,0.1); border-color: var(--accent); color: var(--accent); }
         .pulse-dot {
           width: 8px; height: 8px; border-radius: 50%;
           background: var(--accent);
@@ -131,25 +144,25 @@
           background: var(--surface);
           border-right: 1px solid var(--border);
           display: flex; flex-direction: column;
-          padding: 24px 16px;
-          gap: 4px;
+          padding: 32px 20px;
+          gap: 6px;
           z-index: 100;
         }
         .sidebar-brand {
           font-family: var(--font-head);
-          font-size: 1.3rem; font-weight: 800;
+          font-size: 1.6rem; font-weight: 800;
           letter-spacing: -0.04em;
-          padding: 8px 12px 20px;
+          padding: 8px 12px 32px;
           background: linear-gradient(135deg, #fff 30%, var(--accent) 100%);
           -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .nav-btn {
-          display: flex; align-items: center; gap: 10px;
-          padding: 10px 12px;
+          display: flex; align-items: center; gap: 12px;
+          padding: 12px 16px;
           border-radius: 12px;
           background: transparent;
           color: var(--muted);
-          font-size: 0.88rem; font-weight: 500;
+          font-size: 0.95rem; font-weight: 500;
           transition: all 0.15s;
           width: 100%;
           text-align: left;
@@ -187,33 +200,34 @@
 
         /* ── MAIN CONTENT ────────────────────────────────────────────────── */
         .main {
-          padding: 32px;
+          padding: 48px 64px;
           overflow-y: auto;
           max-height: 100vh;
+          scroll-behavior: smooth;
         }
-        .view { display: none; }
-        .view.active { display: block; animation: fadein 0.2s ease; }
-        @keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+        .view { display: none; max-width: 1400px; margin: 0 auto; }
+        .view.active { display: block; animation: fadein 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes fadein { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 
-        .page-header { margin-bottom: 28px; }
+        .page-header { margin-bottom: 36px; }
         .page-title {
           font-family: var(--font-head);
-          font-size: 1.8rem; font-weight: 800;
+          font-size: 2.2rem; font-weight: 800;
           letter-spacing: -0.03em;
-          margin-bottom: 4px;
+          margin-bottom: 6px;
         }
-        .page-sub { color: var(--muted); font-size: 0.88rem; }
+        .page-sub { color: var(--muted); font-size: 0.95rem; }
 
         /* ── BENTO GRID ──────────────────────────────────────────────────── */
-        .bento { display: grid; gap: 16px; }
+        .bento { display: grid; gap: 24px; }
         .bento-2 { grid-template-columns: 1fr 1fr; }
-        .bento-3 { grid-template-columns: 2fr 1fr 1fr; }
+        .bento-3 { grid-template-columns: 2fr 1.2fr 1.2fr; }
         .bento-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
         .card {
           background: var(--surface);
           border: 1px solid var(--border);
           border-radius: var(--r2);
-          padding: 20px;
+          padding: 28px;
           position: relative; overflow: hidden;
         }
         .card-label {
@@ -246,7 +260,7 @@
           letter-spacing: -0.03em;
           margin-bottom: 6px;
         }
-        .greeting-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+        .greeting-sub { color: var(--muted); font-size: 0.95rem; margin-bottom: 24px; }
         .weather-row {
           display: flex; align-items: center; gap: 12px;
           background: rgba(255,255,255,0.04);
@@ -375,15 +389,15 @@
         /* ── FOCUS TIMER ─────────────────────────────────────────────────── */
         .focus-layout {
           display: grid;
-          grid-template-columns: 1fr 320px;
-          gap: 20px;
+          grid-template-columns: 1fr 340px;
+          gap: 32px;
           align-items: start;
         }
         .timer-card {
           background: var(--surface);
           border: 1px solid var(--border);
           border-radius: var(--r2);
-          padding: 40px 32px;
+          padding: 48px 40px;
           display: flex; flex-direction: column; align-items: center;
           gap: 24px;
         }
@@ -724,12 +738,12 @@
         }
         .view-toggle-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(124,111,255,0.1); }
 
-        .notes-grid { display: grid; gap: 12px; }
+        .notes-grid { display: grid; gap: 16px; }
         .notes-grid.list { grid-template-columns: 1fr; }
-        .notes-grid.grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+        .notes-grid.grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
         .note-card {
           background: var(--surface); border: 1px solid var(--border);
-          border-radius: var(--r); padding: 16px;
+          border-radius: var(--r); padding: 24px;
           cursor: pointer; transition: all 0.15s;
           position: relative; overflow: hidden;
         }
@@ -982,6 +996,7 @@
         <p class="pair-subtitle">Open your Monolith app → Dashboard → Settings → Web Remote. Enter the code shown here.</p>
         <div class="sync-code-display" id="pair-code-display">------</div>
         <div class="pair-hint"><div class="pulse-dot"></div><span id="pair-status">Generating code…</span></div>
+        <button class="demo-btn" onclick="enterDemoMode()">Try Demo Mode</button>
     </div>
 </div>
 
@@ -1408,6 +1423,7 @@
       editPriority: 'med',
       taskEditSubtasks: [],
       viewingNoteId: null,
+      wasConnected: false,
     };
 
     const RITUAL_ICONS = ['🧘','💧','📖','🏃','🍎','😴','🧠','✏️','🎵','📷','❤️','💡','🌅','🏋️','🎯','🌿'];
@@ -1456,6 +1472,7 @@
         const ws = new WebSocket(`wss://sync.monolithapp.io/ws/${code}`);
         STATE.ws = ws;
         ws.onopen = () => {
+          STATE.wasConnected = true;
           document.getElementById('pair-status').textContent = 'Connected — waiting for app…';
           // Request full state immediately
           setTimeout(() => send('REQUEST_FULL_STATE', {}), 500);
@@ -1465,14 +1482,16 @@
         };
         ws.onclose = () => {
           document.getElementById('conn-label').textContent = 'Reconnecting…';
+          if (!STATE.wasConnected) {
+             document.getElementById('pair-status').textContent = 'Connection failed. Retrying...';
+          }
           setTimeout(() => connectWebSocket(code), 3000);
         };
         ws.onerror = () => {
-          // Offline/demo mode — auto-enter with demo data
-          enterDemoMode();
+          document.getElementById('pair-status').textContent = 'Connection error. Check network.';
         };
       } catch(e) {
-        enterDemoMode();
+        document.getElementById('pair-status').textContent = 'Connection error.';
       }
     }
 

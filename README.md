@@ -64,6 +64,7 @@ A powerful companion website hosted on **GitHub Pages** acts as a fully-featured
 - **Unique Pairing Code**: Access the remote by inputting a unique connection code generated directly by your Android app.
 - **Real-time Synchronization**: Acts as a near-instant remote control. Start a timer or add a task on the web, and it will immediately reflect in the app. Data is synced over WebSockets/WebRTC using the device code.
 - **App as Source-of-Truth**: The phone's local database acts as the master storage. The website securely requests the latest state when paired, guaranteeing absolute data privacy and continuity without requiring a dedicated cloud backend.
+- **Demo Mode Preview**: Includes a manual fallback "Demo Mode" for testing layout refinements without an active device connection.
 
 ---
 
