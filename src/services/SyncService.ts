@@ -46,8 +46,8 @@ export const startSyncService = async () => {
   const code = await getSyncCode();
   const channelId = `monolith_sync_${code}`;
   
-  // Connect to PieSocket public cluster
-  ws = new WebSocket(`wss://demo.piesocket.com/v3/${channelId}?api_key=${API_KEY}&notify_self=0`);
+  // Connect to public relay
+  ws = new WebSocket('wss://socketsbay.com/wss/v2/1/demo/');
   
   ws.onopen = () => {
     console.log('[SyncService] Connected using code:', code);
@@ -56,7 +56,7 @@ export const startSyncService = async () => {
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-      if (data && data.__monolith && data.source === 'WEB') {
+      if (data && data.__monolith && data.channel === code && data.source === 'WEB') {
         notifySubscribers(data.type, data.payload);
       }
     } catch (e) {
@@ -75,6 +75,7 @@ export const broadcastSyncUpdate = async (type: string, payload: any) => {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
       __monolith: true,
+      channel: syncCode,
       source: 'APP',
       type,
       payload
