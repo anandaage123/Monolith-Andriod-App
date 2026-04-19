@@ -43,9 +43,18 @@
         }
         button { cursor: pointer; font-family: inherit; border: none; }
         input, textarea, select { font-family: inherit; }
-        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 6px; }
+
+        /* ── AMBIENT GLOW & NOISE ────────────────────────────────────────── */
+        body::after {
+          content: '';
+          position: fixed; inset: 0; z-index: -1;
+          background: radial-gradient(circle at 10% 20%, rgba(124,111,255,0.08), transparent 50%),
+                      radial-gradient(circle at 90% 80%, rgba(61,214,140,0.06), transparent 50%);
+          pointer-events: none;
+        }
 
         /* ── NOISE TEXTURE OVERLAY ───────────────────────────────────────── */
         body::before {
@@ -141,8 +150,9 @@
           width: var(--sidebar);
           height: 100vh;
           position: sticky; top: 0;
-          background: var(--surface);
-          border-right: 1px solid var(--border);
+          background: rgba(17, 17, 24, 0.6);
+          backdrop-filter: blur(24px);
+          border-right: 1px solid rgba(255,255,255,0.04);
           display: flex; flex-direction: column;
           padding: 32px 20px;
           gap: 6px;
@@ -224,11 +234,17 @@
         .bento-3 { grid-template-columns: 2fr 1.2fr 1.2fr; }
         .bento-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
         .card {
-          background: var(--surface);
-          border: 1px solid var(--border);
+          background: rgba(17, 17, 24, 0.6);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(255,255,255,0.05);
           border-radius: var(--r2);
-          padding: 28px;
+          padding: 32px;
           position: relative; overflow: hidden;
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 16px 48px rgba(0,0,0,0.3);
         }
         .card-label {
           font-size: 0.72rem; font-weight: 700;
@@ -305,8 +321,8 @@
         .rituals-section { margin-top: 28px; }
         .rituals-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-          gap: 12px;
+          grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+          gap: 16px;
           margin-top: 14px;
         }
         .ritual-card {
@@ -978,6 +994,37 @@
           .main { padding: 16px; }
           .bento-4 { grid-template-columns: 1fr 1fr; }
           .bento-3 { grid-template-columns: 1fr; }
+          .dashboard-desktop-layout { grid-template-columns: 1fr; gap: 0; }
+          .journal-layout { grid-template-columns: 1fr; gap: 0; }
+        }
+        .dashboard-desktop-layout { display: grid; grid-template-columns: 1fr; gap: 0; }
+        .journal-layout { display: grid; grid-template-columns: 1fr; gap: 0; }
+        @media (min-width: 1300px) {
+          :root { --sidebar: 300px; }
+          html { font-size: 15px; }
+          .main { padding: 64px 96px; }
+          .view { max-width: 1500px; }
+          .bento { gap: 32px; }
+          .card { padding: 40px; }
+          .sidebar { padding: 48px 24px; gap: 8px; }
+          .focus-layout { grid-template-columns: 1fr 420px; gap: 48px; }
+          .timer-card { padding: 64px 48px; }
+          .notes-grid.grid { grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+          .note-card { padding: 32px; }
+          
+          /* Dashboard columns */
+          .dashboard-desktop-layout { grid-template-columns: 2fr 1.2fr; gap: 48px; }
+          .rituals-section { margin-top: 0; }
+          
+          /* Journal layout */
+          .journal-layout { grid-template-columns: 400px 1fr; gap: 56px; }
+          .journal-sidebar { position: sticky; top: 0; }
+          
+          /* Tasks 2-col */
+          .task-add-bar { max-width: 900px; margin-bottom: 24px; padding: 12px; background: rgba(17,17,24,0.4); border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+          .task-list { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+          .task-item { padding: 20px 24px; border-radius: 16px; background: rgba(17,17,24,0.5); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+          .task-item:hover { transform: translateY(-2px); box-shadow: 0 16px 40px rgba(0,0,0,0.2); }
         }
 
         /* ── COLOUR-CODED MODE THEMES ─────────────────────────────────────── */
@@ -1036,65 +1083,71 @@
                 <h1 class="page-title" id="dash-greeting">Good morning.</h1>
                 <p class="page-sub" id="dash-date">Loading…</p>
             </div>
-            <div class="bento bento-3">
-                <!-- Greeting + weather -->
-                <div class="card greeting-card">
-                    <p class="greeting-sub" id="dash-motivation">Rise. Execute. Repeat.</p>
-                    <div class="weather-row" id="weather-row">
-                        <span class="weather-icon" id="w-icon">☁️</span>
-                        <div>
-                            <div class="weather-temp" id="w-temp">--°</div>
-                            <div class="weather-desc" id="w-desc">Loading…</div>
+            <div class="dashboard-desktop-layout">
+                <div class="dashboard-main-col">
+                    <div class="bento bento-3">
+                        <!-- Greeting + weather -->
+                        <div class="card greeting-card">
+                            <p class="greeting-sub" id="dash-motivation">Rise. Execute. Repeat.</p>
+                            <div class="weather-row" id="weather-row">
+                                <span class="weather-icon" id="w-icon">☁️</span>
+                                <div>
+                                    <div class="weather-temp" id="w-temp">--°</div>
+                                    <div class="weather-desc" id="w-desc">Loading…</div>
+                                </div>
+                                <div style="margin-left:auto;font-size:0.75rem;color:var(--muted);line-height:1.4;" id="w-extra"></div>
+                            </div>
+                            <div class="hourly-graph" id="hourly-graph" style="display:none"></div>
                         </div>
-                        <div style="margin-left:auto;font-size:0.75rem;color:var(--muted);line-height:1.4;" id="w-extra"></div>
-                    </div>
-                    <div class="hourly-graph" id="hourly-graph" style="display:none"></div>
-                </div>
-                <!-- Task count -->
-                <div class="card card-glow">
-                    <div class="card-label">Active Tasks</div>
-                    <div class="card-value" id="dash-task-count">0</div>
-                </div>
-                <!-- Rituals progress -->
-                <div class="card">
-                    <div class="card-label">Rituals Today</div>
-                    <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
-                        <div class="completion-ring-wrap">
-                            <svg width="64" height="64" class="timer-ring-svg">
-                                <circle class="timer-ring-bg" cx="32" cy="32" r="26" stroke-width="5" fill="none"/>
-                                <circle id="ritual-ring" cx="32" cy="32" r="26" stroke-width="5" fill="none"
-                                        stroke="var(--accent)" stroke-linecap="round"
-                                        stroke-dasharray="163.36" stroke-dashoffset="163.36"
-                                        style="transition:stroke-dashoffset 0.6s ease;"/>
-                            </svg>
-                            <div class="completion-ring-label">
-                                <div class="ring-pct" id="ritual-pct">0%</div>
+                        <!-- Task count -->
+                        <div class="card card-glow">
+                            <div class="card-label">Active Tasks</div>
+                            <div class="card-value" id="dash-task-count">0</div>
+                        </div>
+                        <!-- Rituals progress -->
+                        <div class="card">
+                            <div class="card-label">Rituals Today</div>
+                            <div style="display:flex;align-items:center;gap:12px;margin-top:8px;">
+                                <div class="completion-ring-wrap">
+                                    <svg width="64" height="64" class="timer-ring-svg">
+                                        <circle class="timer-ring-bg" cx="32" cy="32" r="26" stroke-width="5" fill="none"/>
+                                        <circle id="ritual-ring" cx="32" cy="32" r="26" stroke-width="5" fill="none"
+                                                stroke="var(--accent)" stroke-linecap="round"
+                                                stroke-dasharray="163.36" stroke-dashoffset="163.36"
+                                                style="transition:stroke-dashoffset 0.6s ease;"/>
+                                    </svg>
+                                    <div class="completion-ring-label">
+                                        <div class="ring-pct" id="ritual-pct">0%</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div style="font-size:1.4rem;font-weight:800;font-family:var(--font-head);" id="ritual-count-text">0/0</div>
+                                    <div style="font-size:0.75rem;color:var(--muted);">completed</div>
+                                </div>
                             </div>
                         </div>
-                        <div>
-                            <div style="font-size:1.4rem;font-weight:800;font-family:var(--font-head);" id="ritual-count-text">0/0</div>
-                            <div style="font-size:0.75rem;color:var(--muted);">completed</div>
-                        </div>
+                    </div>
+
+                    <!-- Quote -->
+                    <div class="card quote-card" style="margin-top:24px;">
+                        <div class="quote-text" id="dash-quote">"Crafting your morning inspiration…"</div>
+                        <div class="quote-author" id="dash-quote-author">— Daily Hub</div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Quote -->
-            <div class="card quote-card">
-                <div class="quote-text" id="dash-quote">"Crafting your morning inspiration…"</div>
-                <div class="quote-author" id="dash-quote-author">— Daily Hub</div>
-            </div>
-
-            <!-- Rituals section -->
-            <div class="rituals-section">
-                <div class="section-head">
-                    <div class="section-title">Daily Rituals</div>
-                    <div style="font-size:0.75rem;color:var(--muted)" id="ritual-sub">Synced from app</div>
-                </div>
-                <div class="rituals-grid" id="rituals-grid">
-                    <button class="add-ritual-btn" onclick="openRitualModal()">
-                        <span style="font-size:1.1rem">＋</span> New Ritual
-                    </button>
+                <div class="dashboard-side-col">
+                    <!-- Rituals section -->
+                    <div class="rituals-section">
+                        <div class="section-head">
+                            <div class="section-title">Daily Rituals</div>
+                            <div style="font-size:0.75rem;color:var(--muted)" id="ritual-sub">Synced from app</div>
+                        </div>
+                        <div class="rituals-grid" id="rituals-grid">
+                            <button class="add-ritual-btn" onclick="openRitualModal()">
+                                <span style="font-size:1.1rem">＋</span> New Ritual
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1251,33 +1304,39 @@
                 <h1 class="page-title">Journal</h1>
                 <p class="page-sub">Your daily notes · Live synced</p>
             </div>
-            <div class="note-compose">
-                <input class="note-title-input" id="note-title" placeholder="Entry title…"/>
-                <textarea class="note-content-input" id="note-content" placeholder="What's on your mind…" rows="4"></textarea>
-                <div class="note-compose-footer">
-                    <div class="mood-row" id="mood-row">
-                        <button class="mood-btn" data-mood="😀" onclick="selectMood('😀',this)">😀</button>
-                        <button class="mood-btn" data-mood="❤️" onclick="selectMood('❤️',this)">❤️</button>
-                        <button class="mood-btn" data-mood="😐" onclick="selectMood('😐',this)">😐</button>
-                        <button class="mood-btn" data-mood="😩" onclick="selectMood('😩',this)">😩</button>
-                        <button class="mood-btn" data-mood="😡" onclick="selectMood('😡',this)">😡</button>
-                    </div>
-                    <button class="commit-btn" onclick="addNote()">Commit Log</button>
-                </div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                <div class="note-filters">
-                    <div class="search-bar" style="margin:0;padding:8px 12px;">
-                        <span class="search-icon">🔍</span>
-                        <input class="search-input" placeholder="Search notes…" oninput="searchNotes(this.value)"/>
+            <div class="journal-layout">
+                <div class="journal-sidebar">
+                    <div class="note-compose">
+                        <input class="note-title-input" id="note-title" placeholder="Entry title…"/>
+                        <textarea class="note-content-input" id="note-content" placeholder="What's on your mind…" rows="6"></textarea>
+                        <div class="note-compose-footer">
+                            <div class="mood-row" id="mood-row">
+                                <button class="mood-btn" data-mood="😀" onclick="selectMood('😀',this)">😀</button>
+                                <button class="mood-btn" data-mood="❤️" onclick="selectMood('❤️',this)">❤️</button>
+                                <button class="mood-btn" data-mood="😐" onclick="selectMood('😐',this)">😐</button>
+                                <button class="mood-btn" data-mood="😩" onclick="selectMood('😩',this)">😩</button>
+                                <button class="mood-btn" data-mood="😡" onclick="selectMood('😡',this)">😡</button>
+                            </div>
+                            <button class="commit-btn" onclick="addNote()">Commit Log</button>
+                        </div>
                     </div>
                 </div>
-                <div class="view-toggle">
-                    <button class="view-toggle-btn active" data-nview="list" onclick="setNoteView('list',this)" title="List">☰</button>
-                    <button class="view-toggle-btn" data-nview="grid" onclick="setNoteView('grid',this)" title="Grid">⊞</button>
+                <div class="journal-content">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                        <div class="note-filters">
+                            <div class="search-bar" style="margin:0;padding:8px 16px; border-radius:16px;">
+                                <span class="search-icon">🔍</span>
+                                <input class="search-input" placeholder="Search notes…" oninput="searchNotes(this.value)"/>
+                            </div>
+                        </div>
+                        <div class="view-toggle">
+                            <button class="view-toggle-btn active" data-nview="list" onclick="setNoteView('list',this)" title="List">☰</button>
+                            <button class="view-toggle-btn" data-nview="grid" onclick="setNoteView('grid',this)" title="Grid">⊞</button>
+                        </div>
+                    </div>
+                    <div class="notes-grid list" id="notes-grid"></div>
                 </div>
             </div>
-            <div class="notes-grid list" id="notes-grid"></div>
         </section>
     </main>
 </div>
@@ -1469,7 +1528,8 @@
 
     function connectWebSocket(code) {
       try {
-        const ws = new WebSocket(`wss://sync.monolithapp.io/ws/${code}`);
+        const url = `wss://free.blr2.piesocket.com/v3/${code}?api_key=6gyNU01H5lr7Q8g2ern3HwMLg3MAcysgXPxfZA7C&notify_self=0`;
+        const ws = new WebSocket(url);
         STATE.ws = ws;
         ws.onopen = () => {
           STATE.wasConnected = true;
@@ -1497,12 +1557,19 @@
 
     function send(type, payload) {
       if (STATE.ws && STATE.ws.readyState === 1) {
-        STATE.ws.send(JSON.stringify({ type, payload }));
+        STATE.ws.send(JSON.stringify({
+          __monolith: true,
+          channel: STATE.syncCode,
+          source: 'WEB',
+          type,
+          payload
+        }));
       }
     }
 
-    function handleMessage(msg) {
-      const { type, payload } = msg;
+    function handleMessage(msgRaw) {
+      if (!msgRaw.__monolith || msgRaw.source !== 'APP') return;
+      const { type, payload } = msgRaw;
       if (type === 'FULL_STATE_SYNC') {
         // First real sync — show the app
         if (payload.habits) STATE.habits = payload.habits;
