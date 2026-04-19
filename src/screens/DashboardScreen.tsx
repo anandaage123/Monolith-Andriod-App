@@ -27,6 +27,7 @@ import { scaleFontSize, scaleSize } from '../utils/ResponsiveSize';
 import { APP_VERSION, APP_BUILD } from '../services/UpdateService';
 import { useTheme } from '../context/ThemeContext';
 import { recordHabitCompleted, removeHabitCompleted } from '../services/DailyLogService';
+import { startSyncService, getSyncCode, subscribeToSync, broadcastSyncUpdate } from '../services/SyncService';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path, Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 
@@ -307,6 +308,7 @@ export default function DashboardScreen() {
 
   const [celebrateVisible, setCelebrateVisible] = useState(false);
   const [prevCompletionRate, setPrevCompletionRate] = useState(0);
+  const [syncCode, setSyncCode] = useState<string>('------');
 
   // ── Animation refs ─────────────────────────────────────────────────────────
   const swipeRefs = useRef<{ [key: string]: Swipeable | null }>({}).current;
@@ -392,15 +394,69 @@ export default function DashboardScreen() {
     }
   };
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
   useEffect(() => {
     loadEssentialData();
     const handle = requestIdleCallback(() => {
       setIsReady(true);
       startEntranceAnimation();
+      initSync();
     });
     return () => cancelIdleCallback(handle);
   }, []);
+
+  const initSync = async () => {
+    const code = await getSyncCode();
+    setSyncCode(code);
+    await startSyncService();
+    
+    // Process incoming control streams from web
+    const unsub = subscribeToSync(async (type, payload) => {
+      try {
+        const rawTodos = await AsyncStorage.getItem('@todos_v3');
+        const tasks = rawTodos ? JSON.parse(rawTodos) : [];
+        const formatTasks = (ts: any[]) => ts.filter(t => !t.archived && t.tag !== 'Shopping').map(t => ({ id: t.id, title: t.text, completed: t.completed }));
+
+        if (type === 'REQUEST_FULL_STATE') {
+          broadcastSyncUpdate('FULL_STATE_SYNC', {
+            greeting: 'Good Day.',
+            timer: { isRunning: false, timeRemaining: 1500, mode: 'FOCUS' },
+            tasks: formatTasks(tasks)
+          });
+        }
+        else if (type === 'TASK_ADD') {
+          const newTask = {
+             id: payload.id || String(Date.now()),
+             text: payload.title,
+             completed: false,
+             archived: false,
+             priority: payload.priority || 'med',
+             subtasks: [],
+             createdAt: Date.now()
+          };
+          tasks.unshift(newTask);
+          await AsyncStorage.setItem('@todos_v3', JSON.stringify(tasks));
+          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(tasks) });
+        }
+        else if (type === 'TASK_TOGGLE') {
+          const updatedTasks = tasks.map((t: any) => t.id === payload.id ? { ...t, completed: payload.completed } : t);
+          await AsyncStorage.setItem('@todos_v3', JSON.stringify(updatedTasks));
+          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(updatedTasks) });
+        }
+        else if (['TIMER_START', 'TIMER_PAUSE', 'TIMER_RESET'].includes(type)) {
+          // Timer local generic state
+          // Native integration would bridge to `FocusScreen` active session context
+          broadcastSyncUpdate('TIMER_STATE_UPDATE', {
+             isRunning: type === 'TIMER_START',
+             timeRemaining: type === 'TIMER_RESET' ? 1500 : (payload?.timeRemaining || 1500),
+             mode: payload?.mode || 'FOCUS'
+          });
+        }
+      } catch (e) {
+        console.error('Core sync mapping error', e);
+      }
+    });
+    return unsub;
+  };
 
   useEffect(() => {
     if (isFocused && isReady) {
@@ -950,6 +1006,15 @@ export default function DashboardScreen() {
                 {completionRate === 100 ? 'All Done. 🏆' : 'Rise & Execute.'}
               </Text>
               <Text style={styles.greetingSub}>{motivationalMsg}</Text>
+              
+              {syncCode !== '------' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: 'rgba(136, 153, 255, 0.1)', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 6 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary }} />
+                  <Text style={{ ...Typography.caption, color: colors.primary, fontWeight: '700', fontSize: scaleFontSize(12), letterSpacing: 1 }}>
+                    REMOTE LINK: <Text style={{ letterSpacing: 3 }}>{syncCode}</Text>
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         ))}
