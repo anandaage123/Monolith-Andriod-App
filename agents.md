@@ -82,8 +82,11 @@
 - **Month/Year Pivot**: Persistent state for time-traveling through past records with specific month/year budget overrides.
 
 ### ◈ Web Companion (Monolith Remote)
-- **WebSockets Strategy**: Connects via a 6-character code. Fallback handles connection failures gracefully with a manual "Demo Mode" button, replacing legacy forced-fallback logic to avoid prematurely hiding the code.
-- **Desktop Grid Optimization**: Fluid responsive interfaces use smart CSS grid bento parameters (`max-width: 1400px`, dynamic gaps and paddings) to effortlessly expand across ultra-wide desktop monitors.
+- **WebSockets Strategy**: Connects via 6-char code to PieSocket (`free.blr2.piesocket.com`). Responds to `APP_CONNECTED` event to re-issue `REQUEST_FULL_STATE`. Outgoing messages include `__monolith`, `channel`, `source: 'WEB'` wrapper.
+- **Frontend Design System**: Complete dark-mode glassmorphism UI. Uses `Syne` for headings, `DM Sans` for body, `DM Mono` for timers/code. CSS variables: `--bg #050507`, `--accent #7c6fff`, `--green`, `--red`, `--yellow`.
+- **View Switching**: `.view { display:none }` / `.view.active { display:block }`. Nav function toggles `.active` class.
+- **Responsive Layout**: Sidebar collapses to bottom bar on mobile (<700px). Dashboard, Tasks, Focus, Journal all switch to single-column. Desktop (>1100px) uses 2-column grids.
+- **JS Class Mapping**: `ritual-card.completed`, `r-info/r-icon/r-name/r-streak/r-check`, `task-item.completed`, `task-badge.badge-high/med/low`, `task-content`, `task-actions`, `note-card-title/content/footer`, `icon-option.selected`.
 
 ## 4. Engineering Standards & Guardrails
 - **Scroll Performance**: All root containers must use `flex: 1`. `ScrollView` must use `contentContainerStyle={{ flexGrow: 1 }}` to avoid layout clipping.
