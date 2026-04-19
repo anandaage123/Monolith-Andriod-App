@@ -1,11 +1,11 @@
 {
-  "version": "3.5.5",
-  "build": 53,
-  "versionCode": 53,
+  "version": "3.6.0",
+  "build": 54,
+  "versionCode": 54,
   "releaseDate": "2026-04-19",
-  "releaseNotes": "\u2022 UI and task timer improvements",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.5.5/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.5.5",
+  "releaseNotes": "\u2022 Bug fixes and improvements",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.6.0/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.6.0",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
