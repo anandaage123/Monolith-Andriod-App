@@ -1,6 +1,6 @@
 # Daily Life
 
-**Daily Life** is a comprehensive productivity and lifestyle management application built with React Native and Expo. It features a sleek dark-themed interface designed to help users manage their daily tasks, habits, finances, and focus sessions in one place.
+**Daily Life** is a comprehensive productivity and lifestyle management application built with React Native and Expo. It features a sleek dark-themed interface designed to help users manage their daily tasks, habits, and focus sessions in one place.
 
 ## 📱 UI Design & Aesthetics
 
@@ -27,12 +27,6 @@ The application follows a modern **Dark-Theme** aesthetic with the following des
 - **Sweep Feature**: Easily clear all tasks with a single "Sweep" action.
 - **Persistence**: All tasks are saved locally using `AsyncStorage`.
 
-### 3. 💰 Budget Tracker (Budget)
-- **Expense Logging**: Track your spending with titles and amounts.
-- **Budget Limit**: Set a monthly or daily budget limit and see real-time balance calculations.
-- **Visual Indicators**: Color-coded badges indicate if you are within budget or over-limit.
-- **History**: View a list of recent expenses with dates and categories.
-
 ### 4. ⏱️ Focus Timer (Focus)
 - **Liquid-Fill Animation**: A modern visual timer where the background "fills" up as time progresses, providing an intuitive sense of remaining time.
 - **Asymmetric Mode Selection**: Switch between "Deep Work" and "Short Break" using a modern, card-based interface.
@@ -58,6 +52,18 @@ The application follows a modern **Dark-Theme** aesthetic with the following des
 - **Storage**: `@react-native-async-storage/async-storage` for local data persistence.
 - **Navigation**: `@react-navigation/native` with Stack and Bottom Tab navigators.
 - **API Connectivity**: Integration with Geocoding, Open-Meteo, and ZenQuotes.
+
+---
+
+## 🌐 Web Companion (Monolith Remote)
+
+A powerful companion website hosted on **GitHub Pages** acts as a fully-featured desktop remote for the Android app. 
+
+### How It Works
+- **Feature Parity**: The web interface mirrors all native app functionalities: Focus Timers, To-Dos management, Dashboard insights, and Journaling.
+- **Unique Pairing Code**: Access the remote by inputting a unique connection code generated directly by your Android app.
+- **Real-time Synchronization**: Acts as a near-instant remote control. Start a timer or add a task on the web, and it will immediately reflect in the app. Data is synced over WebSockets/WebRTC using the device code.
+- **App as Source-of-Truth**: The phone's local database acts as the master storage. The website securely requests the latest state when paired, guaranteeing absolute data privacy and continuity without requiring a dedicated cloud backend.
 
 ---
 

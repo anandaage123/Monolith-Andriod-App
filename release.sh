@@ -139,29 +139,33 @@ header "Deployment Goal: Connected Device + GitHub"
 info "Building with Gradle and side-loading update to your connected device."
 echo ""
 
-# ─── Step 4: Release notes ───────────────────────────────────────────────────
+# ─── Step 4: Release notes from Commits ──────────────────────────────────────
 header "Release Notes"
 
-echo -e "  ${DIM}What changed in this release? Enter one item per line.${RESET}"
-echo -e "  ${DIM}Press ENTER on a blank line when done.${RESET}"
-echo ""
+LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+if [[ -n "$LAST_TAG" ]]; then
+  info "Extracting commits since ${LAST_TAG}..."
+  COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"• %s")
+else
+  info "Extracting all commits..."
+  COMMITS=$(git log --pretty=format:"• %s")
+fi
 
 NOTES_LINES=()
-while true; do
-  echo -ne "  ${CYAN}+${RESET} "
-  read -r NOTE_LINE
-  [[ -z "$NOTE_LINE" ]] && break
-  NOTES_LINES+=("• $NOTE_LINE")
-done
+while IFS= read -r line; do
+  if [[ -n "$line" ]]; then
+    NOTES_LINES+=("$line")
+  fi
+done <<< "$COMMITS"
 
 if [[ ${#NOTES_LINES[@]} -eq 0 ]]; then
-  warn "No notes entered — using default"
+  warn "No new commits found — using default"
   NOTES_LINES=("• Bug fixes and improvements")
 fi
 
 RELEASE_NOTES_TEXT=$(printf '%s\n' "${NOTES_LINES[@]}")
 echo ""
-echo -e "  ${GREEN}Release notes saved:${RESET}"
+echo -e "  ${GREEN}Auto-generated release notes:${RESET}"
 printf '    %s\n' "${NOTES_LINES[@]}"
 echo ""
 
@@ -300,10 +304,42 @@ success "version.json updated"
 dim "Download URL: ${DOWNLOAD_URL}"
 echo ""
 
+# ─── Step 8.5: Update CHANGELOG.md ───────────────────────────────────────────
+header "Updating CHANGELOG.md"
+
+python3 - "${TAG}" "${RELEASE_DATE}" "${RELEASE_NOTES_TEXT}" <<'PYEOF'
+import sys
+tag = sys.argv[1]
+ds = sys.argv[2]
+raw_notes = sys.argv[3]
+
+# Convert "• line" to "- line"
+notes = "\n".join(["- " + line.lstrip("• ") for line in raw_notes.split("\n") if line.strip()])
+
+entry = f"## {tag} ({ds})\n\n{notes}\n\n"
+
+try:
+    with open("CHANGELOG.md", "r") as f:
+        content = f.read()
+except FileNotFoundError:
+    content = "# Changelog\n\n"
+
+if "# Changelog" in content:
+    content = content.replace("# Changelog", f"# Changelog\n\n{entry}", 1)
+else:
+    content = f"# Changelog\n\n{entry}{content}"
+
+with open("CHANGELOG.md", "w") as f:
+    f.write(content.replace("\n\n\n\n", "\n\n").replace("\n\n\n", "\n\n"))
+PYEOF
+
+success "CHANGELOG.md updated"
+echo ""
+
 # ─── Step 9: Git commit & tag ────────────────────────────────────────────────
 header "Committing & Tagging"
 
-git add app.json package.json version.json src/services/UpdateService.ts
+git add app.json package.json version.json src/services/UpdateService.ts CHANGELOG.md
 
 # Stage the APK if you want it tracked (optional; usually skipped)
 # git add "${DEST_APK}"  # uncomment if you want APK in git (not recommended for large files)
