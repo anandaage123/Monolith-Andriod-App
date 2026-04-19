@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_KEY = 'O3b65Vq12H8k2Mh8N1jD1i2vB3k8A4K3dZ8G9e1O';
+const API_KEY = 'VCXCEuvhGcBDP7XhiJJUDvR1e1D3eiVjgZ9VRiaV';
 let ws: WebSocket | null = null;
 let syncCode: string | null = null;
 
@@ -47,7 +47,7 @@ export const startSyncService = async () => {
   const channelId = `monolith_sync_${code}`;
   
   // Connect to PieSocket public cluster
-  ws = new WebSocket(`wss://cluster.piesocket.com/v3/${channelId}?api_key=${API_KEY}&notify_self=0`);
+  ws = new WebSocket(`wss://demo.piesocket.com/v3/${channelId}?api_key=${API_KEY}&notify_self=0`);
   
   ws.onopen = () => {
     console.log('[SyncService] Connected using code:', code);
