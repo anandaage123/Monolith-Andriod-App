@@ -44,6 +44,16 @@ export const startSyncService = async (providedCode?: string) => {
   
   ws.onopen = () => {
     console.log('[SyncService] Connected using code:', code);
+    // Let the web remote know we have successfully joined the channel
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        __monolith: true,
+        channel: code,
+        source: 'APP',
+        type: 'APP_CONNECTED',
+        payload: {}
+      }));
+    }
   };
   
   ws.onmessage = (event) => {
