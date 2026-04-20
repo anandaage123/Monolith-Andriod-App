@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.7.2 (2026-04-20)
+
+- perf: reduce battery drain in Focus and Journal screens
+- perf: optimise battery and CPU usage
+- docs: update agents.md with current architecture and file locations
+- chore: move web remote files to root for GitHub Pages
+- docs: add comprehensive app feature documentation
+
 ## v3.7.1 (2026-04-19)
 
 - refactor: simplify CSS variables and update font configuration in index.html

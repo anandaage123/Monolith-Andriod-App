@@ -1,11 +1,11 @@
 {
-  "version": "3.7.1",
-  "build": 56,
-  "versionCode": 56,
-  "releaseDate": "2026-04-19",
-  "releaseNotes": "\u2022 refactor: simplify CSS variables and update font configuration in index.html\n\u2022 feat: implement dark-mode glassmorphism UI and PieSocket integration for Web Companion",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.7.1/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.7.1",
+  "version": "3.7.2",
+  "build": 57,
+  "versionCode": 57,
+  "releaseDate": "2026-04-20",
+  "releaseNotes": "\u2022 perf: reduce battery drain in Focus and Journal screens\n\u2022 perf: optimise battery and CPU usage\n\u2022 docs: update agents.md with current architecture and file locations\n\u2022 chore: move web remote files to root for GitHub Pages\n\u2022 docs: add comprehensive app feature documentation",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.7.2/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.7.2",
   "minBuildRequired": 1,
   "forceUpdate": false
 }
