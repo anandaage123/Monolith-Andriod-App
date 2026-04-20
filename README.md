@@ -39,9 +39,6 @@ The application follows a modern **Dark-Theme** aesthetic with the following des
 - **Quick Jot**: Create and manage personal notes.
 - **Rich Interaction**: Simple interface for capturing thoughts on the go.
 
-### 6. 🔐 Secret Vault
-- **Hidden Access**: A secret navigation trigger on the Dashboard (Long press on header) allows access to a private Vault area.
-
 ---
 
 ## 🛠️ Technical Implementation
