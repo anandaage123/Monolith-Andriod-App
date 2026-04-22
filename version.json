@@ -1,11 +1,11 @@
 {
-  "version": "3.7.5",
-  "build": 60,
-  "versionCode": 60,
+  "version": "3.7.6",
+  "build": 61,
+  "versionCode": 61,
   "releaseDate": "2026-04-22",
-  "releaseNotes": "\u2022 feat: implement robust WebSocket synchronization with auto-reconnect, heartbeats, and atomic storage updates per message type",
-  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.7.5/Monolith.apk",
-  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.7.5",
+  "releaseNotes": "\u2022 Bug fixes and improvements",
+  "downloadUrl": "https://github.com/anandaage123/daily-app/releases/download/v3.7.6/Monolith.apk",
+  "releaseUrl": "https://github.com/anandaage123/daily-app/releases/tag/v3.7.6",
   "minBuildRequired": 1,
   "forceUpdate": false
 }

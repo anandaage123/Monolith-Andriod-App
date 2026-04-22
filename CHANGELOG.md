@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.7.6 (2026-04-22)
+
+- Bug fixes and improvements
+
 ## v3.7.5 (2026-04-22)
 
 - feat: implement robust WebSocket synchronization with auto-reconnect, heartbeats, and atomic storage updates per message type
