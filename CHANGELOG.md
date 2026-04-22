@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.7.3 (2026-04-22)
+
+- feat: add native Android homescreen widget support and implement a reports analytics view for focus tracking
+- refactor: remove Galaxy S23 device cache and update index.html structure
+- Update the README with the latest change information.
+
 ## v3.7.2 (2026-04-20)
 
 - perf: reduce battery drain in Focus and Journal screens
