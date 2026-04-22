@@ -2247,6 +2247,9 @@
       <button class="nav-item" data-view="focus" onclick="nav('focus')">
         <span class="ms">timer</span><span>Focus</span>
       </button>
+      <button class="nav-item" data-view="reports" onclick="nav('reports')">
+        <span class="ms">bar_chart</span><span>Reports</span>
+      </button>
       <button class="nav-item" data-view="journal" onclick="nav('journal')">
         <span class="ms">edit_note</span><span>Journal</span>
       </button>
@@ -2541,6 +2544,54 @@
           </div>
 
           <div class="notes-grid list" id="notes-grid"></div>
+        </section>
+
+          <!-- ══ REPORTS ══ -->
+        <section class="view" id="view-reports">
+          <div class="page-title">Reports</div>
+          <div class="page-sub">Clockify-style analytics · synced from app</div>
+
+          <!-- Summary row -->
+          <div class="bento bento-3" style="margin-bottom:14px">
+            <div class="card" id="rep-total-card">
+              <div class="card-label">Total Focus Time</div>
+              <div class="card-big-num" id="rep-total-time">0h 0m</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:8px">across all sessions today</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Sessions Done</div>
+              <div class="card-big-num" id="rep-sessions">0</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:8px">focus sprints logged</div>
+            </div>
+            <div class="card">
+              <div class="card-label">Tasks Completed</div>
+              <div class="card-big-num" id="rep-tasks-done">0</div>
+              <div style="font-size:0.72rem;color:var(--muted);margin-top:8px">out of <span id="rep-tasks-total">0</span> total</div>
+            </div>
+          </div>
+
+          <!-- Tag breakdown -->
+          <div class="section-head">
+            <div class="section-title">Focus by Category</div>
+          </div>
+          <div class="card" style="margin-bottom:14px" id="rep-tags-card">
+            <div id="rep-tags-chart" style="display:flex;flex-direction:column;gap:10px"></div>
+          </div>
+
+          <!-- Ritual streak table -->
+          <div class="section-head">
+            <div class="section-title">Ritual Streaks</div>
+          </div>
+          <div class="card" id="rep-streaks-card">
+            <div id="rep-streaks-list" style="display:flex;flex-direction:column;gap:8px"></div>
+          </div>
+
+          <!-- Time entries log -->
+          <div class="section-head" style="margin-top:20px">
+            <div class="section-title">Time Entries</div>
+            <button onclick="clearTimeEntries()" style="font-size:0.72rem;color:var(--red);background:rgba(255,107,107,0.08);border:1px solid rgba(255,107,107,0.18);border-radius:8px;padding:5px 12px;font-family:var(--fn-h);font-weight:700;">Clear</button>
+          </div>
+          <div id="rep-time-entries" style="display:flex;flex-direction:column;gap:6px"></div>
         </section>
 
       </div><!-- /scroll-area -->
@@ -2851,6 +2902,7 @@
       dashboard: ['Dashboard', 'Your productivity command center'],
       tasks: ['Tasks & Priority', 'Live syncing with your app'],
       focus: ['Deep Focus', 'Remote timer control · Live sync'],
+      reports: ['Reports', 'Focus time · task stats · streaks'],
       journal: ['Daily Notes', 'Your synced journal entries'],
     };
     function nav(view) {
@@ -2871,7 +2923,7 @@
     // RENDER ALL
     // ══════════════════════════════════════════════════════════════════
     function renderAll() {
-      renderDashStats(); renderRituals(); renderTasks(); renderNotes(); renderQuote(); renderWeather();
+      renderDashStats(); renderRituals(); renderTasks(); renderNotes(); renderQuote(); renderWeather(); renderReports();
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -3280,9 +3332,14 @@
     }
     function logSession(minutes) {
       const m = MODES[STATE.localTimer.mode];
-      STATE.localTimer.sessionLog.unshift({ name: STATE.localTimer.sessionName || (m ? m.name : 'Focus'), tag: STATE.localTimer.tag, minutes, color: m ? m.color : '#8b80ff', ts: Date.now() });
+      const entry = { name: STATE.localTimer.sessionName || (m ? m.name : 'Focus'), tag: STATE.localTimer.tag, minutes, color: m ? m.color : '#8b80ff', ts: Date.now(), linkedTask: STATE.localTimer.linkedTask?.name || null };
+      STATE.localTimer.sessionLog.unshift(entry);
       if (STATE.localTimer.sessionLog.length > 5) STATE.localTimer.sessionLog.pop();
+      // Also push to reports time entries
+      if (!window._timeEntries) window._timeEntries = [];
+      window._timeEntries.push(entry);
       renderSessionLog();
+      renderReports();
     }
     function renderSessionLog() {
       const el = document.getElementById('session-log');

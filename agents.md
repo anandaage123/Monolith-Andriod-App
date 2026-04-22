@@ -108,10 +108,22 @@
 ### ◈ Web Companion (Monolith Remote)
 - **Files**: `index.html`, `app.css`, `app.js` — all at project root for **GitHub Pages** deployment.
 - **WebSockets Strategy**: Connects via 6-char code to PieSocket (`free.blr2.piesocket.com`). Responds to `APP_CONNECTED` event to re-issue `REQUEST_FULL_STATE`. Outgoing messages include `__monolith`, `channel`, `source: 'WEB'` wrapper.
-- **Frontend Design System**: Complete dark-mode glassmorphism UI. Uses `Syne` for headings, `DM Sans` for body, `DM Mono` for timers/code. CSS variables: `--bg #050507`, `--accent #7c6fff`, `--green`, `--red`, `--yellow`.
+- **Frontend Design System**: Complete dark-mode glassmorphism UI. Uses `Space Grotesk` for headings, `Manrope` for body, `JetBrains Mono` for timers/code. CSS variables: `--bg #0e0e10`, `--p #c5c0ff`, `--p-hi #8b80ff`, `--green #3ecf8e`.
+- **Views**: Dashboard, Tasks, Focus (timer), **Reports** (Clockify-style analytics), Journal.
+- **Reports View**: Focus time totals, sessions count, tasks completed, tag breakdown bar chart, ritual streaks table, time entries log (populated by `logSession()` calls). Entries persist in `window._timeEntries`.
 - **View Switching**: `.view { display:none }` / `.view.active { display:block }`. Nav function toggles `.active` class.
-- **Responsive Layout**: Sidebar collapses to bottom bar on mobile (<700px). Dashboard, Tasks, Focus, Journal all switch to single-column. Desktop (>1100px) uses 2-column grids.
+- **Responsive Layout**: Sidebar collapses to bottom bar on mobile (<960px).
 - **JS Class Mapping**: `ritual-card.completed`, `r-info/r-icon/r-name/r-streak/r-check`, `task-item.completed`, `task-badge.badge-high/med/low`, `task-content`, `task-actions`, `note-card-title/content/footer`, `icon-option.selected`.
+
+### ◈ Homescreen Widget (Android)
+- **Files**: `android/app/src/main/java/com/anandaage/dailyapp/TaskTimerWidget.kt` — `AppWidgetProvider`.
+- **Native Module**: `MonolithWidgetModule.kt` — `ReactContextBaseJavaModule` named `MonolithWidget`.
+- **JS Bridge**: `src/services/WidgetBridge.ts` — calls `NativeModules.MonolithWidget.updateWidget(data)` on Android.
+- **Layout**: `res/layout/widget_task_timer.xml` — 4×2 cell, shows active task count + timer display + play/pause button.
+- **AppWidget Metadata**: `res/xml/task_timer_widget_info.xml`.
+- **Manifest**: `TaskTimerWidget` receiver registered with `APPWIDGET_UPDATE`, `TIMER_TOGGLE`, `OPEN_APP` intent-filters.
+- **Data flow**: `saveTodosToStorage` → `WidgetBridge.update(activeTasks)`. Timer tick → `WidgetBridge.update(timerSeconds, isRunning)`.
+- **SharedPrefs key**: `MonolithWidgetPrefs` with keys `active_tasks`, `timer_seconds`, `timer_running`, `session_name`.
 
 ## 4. Engineering Standards & Guardrails
 - **Scroll Performance**: All root containers must use `flex: 1`. `ScrollView` must use `contentContainerStyle={{ flexGrow: 1 }}` to avoid layout clipping.

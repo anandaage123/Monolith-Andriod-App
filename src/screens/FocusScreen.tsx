@@ -28,6 +28,7 @@ import { scaleFontSize } from '../utils/ResponsiveSize';
 import { useTheme } from '../context/ThemeContext';
 import { useAudioPlayer } from 'expo-audio';
 import { recordFocusSession, recordHabitCompleted, recordTodoCompleted } from '../services/DailyLogService';
+import WidgetBridge from '../services/WidgetBridge';
 
 // ─── Task Selection Types ──────────────────────────────────────────────────
 interface LinkedTask {
@@ -1151,6 +1152,7 @@ export default function FocusScreen() {
               if (Platform.OS !== 'web') Vibration.vibrate([0, 500, 200, 500, 200, 500]);
               player.play();
             }
+            WidgetBridge.update({ activeTasks: 0, timerSeconds: next, isRunning: true, sessionName: sessionName || mode.name });
             return next;
           });
         }, 1000);
@@ -1279,6 +1281,7 @@ export default function FocusScreen() {
     setIsActive(false);
     setCompletedSprints(0);
     setCurrentSprint(0);
+    WidgetBridge.update({ activeTasks: 0, timerSeconds: 0, isRunning: false, sessionName: '' });
   };
 
   const doExitSession = () => {

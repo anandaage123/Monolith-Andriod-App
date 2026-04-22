@@ -29,6 +29,7 @@ import { scaleFontSize } from '../utils/ResponsiveSize';
 import { useTheme } from '../context/ThemeContext';
 import { recordTodoCompleted, removeTodoCompleted } from '../services/DailyLogService';
 import { broadcastSyncUpdate } from '../services/SyncService';
+import WidgetBridge from '../services/WidgetBridge';
 
 const { width } = Dimensions.get('window');
 
@@ -104,6 +105,8 @@ async function saveTodosToStorage(todos: Todo[]): Promise<void> {
     await AsyncStorage.setItem(TODOS_KEY, JSON.stringify(todos));
     const formatTasks = (ts: any[]) => ts.filter(t => !t.archived && t.tag !== 'Shopping').map(t => ({ id: t.id, title: t.text, completed: t.completed, priority: t.priority, subtasks: t.subtasks }));
     broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(todos) });
+    const activeTasks = todos.filter(t => !t.completed && !t.archived).length;
+    WidgetBridge.update({ activeTasks, timerSeconds: 0, isRunning: false });
   } catch (e) {
     console.error('Save todos error:', e);
   }
