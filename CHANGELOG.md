@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.7.5 (2026-04-22)
+
+- feat: implement robust WebSocket synchronization with auto-reconnect, heartbeats, and atomic storage updates per message type
+
 ## v3.7.4 (2026-04-22)
 
 - chore: update device streaming configuration and project assets
