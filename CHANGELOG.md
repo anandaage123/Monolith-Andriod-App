@@ -1,5 +1,9 @@
 # Changelog
 
+## v3.7.7 (2026-04-23)
+
+- Bug fixes and improvements
+
 ## v3.7.6 (2026-04-22)
 
 - Bug fixes and improvements
