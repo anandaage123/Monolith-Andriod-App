@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_KEY = 'VCXCEuvhGcBDP7XhiJJUDvR1e1D3eiVjgZ9VRiaV';
 let ws: WebSocket | null = null;
 let syncCode: string | null = null;
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
 // Subscribers
 type SyncCallback = (type: string, payload: any) => void;
@@ -23,74 +23,73 @@ const notifySubscribers = (type: string, payload: any) => {
 export const getSyncCode = async (): Promise<string | null> => {
   if (syncCode) return syncCode;
   const cached = await AsyncStorage.getItem('@monolith_sync_code');
-  if (cached) {
-    syncCode = cached;
-    return cached;
-  }
+  if (cached) { syncCode = cached; return cached; }
   return null;
 };
 
 export const startSyncService = async (providedCode?: string) => {
-  if (ws) return; // Already running
   const code = providedCode || await getSyncCode();
-  if (!code) return; // No code provided, do not connect
-  
+  if (!code) return;
+
+  // Already open on the same code — do nothing
+  if (ws && ws.readyState === WebSocket.OPEN && syncCode === code) return;
+
+  // Clean up stale socket
+  if (ws) {
+    ws.onclose = null; ws.onerror = null; ws.onmessage = null;
+    if (ws.readyState < WebSocket.CLOSING) ws.close();
+    ws = null;
+  }
+  if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+
   syncCode = code;
   await AsyncStorage.setItem('@monolith_sync_code', code);
-  const channelId = `monolith_sync_${code}`;
-  
-  // Connect to private cluster with the connection code as the channel ID
+
   ws = new WebSocket(`wss://free.blr2.piesocket.com/v3/${code}?api_key=6gyNU01H5lr7Q8g2ern3HwMLg3MAcysgXPxfZA7C&notify_self=1`);
-  
+
   ws.onopen = () => {
-    console.log('[SyncService] Connected using code:', code);
-    // Let the web remote know we have successfully joined the channel
+    console.log('[SyncService] Connected:', code);
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        __monolith: true,
-        channel: code,
-        source: 'APP',
-        type: 'APP_CONNECTED',
-        payload: {}
-      }));
+      ws.send(JSON.stringify({ __monolith: true, channel: code, source: 'APP', type: 'APP_CONNECTED', payload: {} }));
     }
+    // Heartbeat — keep PieSocket free-tier alive
+    heartbeatInterval = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ __monolith: true, channel: code, source: 'APP', type: 'PING', payload: {} }));
+      }
+    }, 25000);
   };
-  
+
   ws.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
       if (data && data.__monolith && data.channel === code && data.source === 'WEB') {
         notifySubscribers(data.type, data.payload);
       }
-    } catch (e) {
-      // Ignored
-    }
+    } catch (e) { }
   };
-  
+
   ws.onclose = () => {
-    console.log('[SyncService] Disconnected.');
+    console.log('[SyncService] Disconnected — retrying in 4s');
     ws = null;
-    // We do not auto-reconnect anymore to save background resources. They must reconnect manually.
+    if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+    setTimeout(() => startSyncService(code), 4000);
   };
 };
 
 export const stopSyncService = async () => {
   if (ws) {
+    ws.onclose = null; // prevent auto-reconnect on manual stop
     ws.close();
     ws = null;
   }
+  if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
   syncCode = null;
   await AsyncStorage.removeItem('@monolith_sync_code');
 };
 
 export const broadcastSyncUpdate = async (type: string, payload: any) => {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({
-      __monolith: true,
-      channel: syncCode,
-      source: 'APP',
-      type,
-      payload
-    }));
+    ws.send(JSON.stringify({ __monolith: true, channel: syncCode, source: 'APP', type, payload }));
   }
 };

@@ -44,6 +44,11 @@
 - **`SyncService.ts`**: WebSocket real-time sync with web remote.
     - Connects to PieSocket (`wss://free.blr2.piesocket.com/v3/{code}`).
     - Handles bidirectional message routing: habits, tasks, notes, timer state.
+    - **Auto-reconnect**: `onclose` retries `startSyncService(code)` after 4s. `stopSyncService` nulls `onclose` first to prevent unwanted retry.
+    - **Heartbeat**: Sends a `PING` frame every 25s in `onopen` to keep PieSocket free-tier alive.
+    - **Stale-socket guard**: Before creating new WS, nulls handlers on old socket and closes it.
+    - **Same-code guard**: If `ws.readyState === OPEN && syncCode === code`, skips reconnect.
+    - **Subscriber handlers** (in `DashboardScreen.tsx → initSync`): Each message type (`HABIT_TOGGLE`, `TASK_TOGGLE`, `TASK_ADD`, `TASK_UPDATE`, `TASK_DELETE`, `HABIT_ADD`, `HABIT_UPDATE`, `HABIT_DELETE`, `NOTE_ADD`) reads its own AsyncStorage key independently — never relies on variables from other branches. Missing this causes all web→app actions to silently fail.
 
 ## 3. Detailed Feature Specifications
 
@@ -130,6 +135,8 @@
 - **Manifest**: `TaskTimerWidget` receiver registered with `APPWIDGET_UPDATE`, `TIMER_TOGGLE`, `OPEN_APP` intent-filters.
 - **Data flow**: `saveTodosToStorage` → `WidgetBridge.update(activeTasks)`. Timer tick → `WidgetBridge.update(timerSeconds, isRunning)`.
 - **SharedPrefs key**: `MonolithWidgetPrefs` with keys `active_tasks`, `timer_seconds`, `timer_running`, `session_name`.
+- **Widget button flow**: Widget fires `ACTION_TIMER_TOGGLE` → sends `com.anandaage.dailyapp.RN_TIMER_TOGGLE` broadcast → `MonolithWidgetModule` BroadcastReceiver receives it → emits `onWidgetTimerToggle` via `DeviceEventManagerModule.RCTDeviceEventEmitter` → `FocusScreen` `DeviceEventEmitter.addListener('onWidgetTimerToggle')` toggles `isActive`.
+- **MonolithWidgetModule cleanup**: Receiver unregistered in `onCatalystInstanceDestroy` to prevent memory leaks.
 
 ## 4. Engineering Standards & Guardrails
 - **Scroll Performance**: All root containers must use `flex: 1`. `ScrollView` must use `contentContainerStyle={{ flexGrow: 1 }}` to avoid layout clipping.

@@ -431,7 +431,8 @@ export default function DashboardScreen() {
 
     const unsub = subscribeToSync(async (type, payload) => {
       try {
-        // Only read the storage keys actually needed for this message type
+        if (type === 'PING') return; // heartbeat, ignore
+
         if (type === 'REQUEST_FULL_STATE') {
           const [rawTodos, rawNotes, rawHabits] = await Promise.all([
             AsyncStorage.getItem('@todos_v3'),
@@ -440,76 +441,112 @@ export default function DashboardScreen() {
           ]);
           const tasks = rawTodos ? JSON.parse(rawTodos) : [];
           const notes = rawNotes ? JSON.parse(rawNotes) : [];
-          const currentHabits = rawHabits ? JSON.parse(rawHabits) : [];
+          const habits = rawHabits ? JSON.parse(rawHabits) : [];
           broadcastSyncUpdate('FULL_STATE_SYNC', {
             greeting: 'Good Day.',
             timer: { isRunning: false, timeRemaining: 1500, mode: 'FOCUS' },
             tasks: formatTasks(tasks),
             notes: formatNotes(notes),
-            habits: currentHabits,
-            weather: weather,
-            quote: quote
+            habits,
+            weather,
+            quote
           });
         }
+
         else if (type === 'HABIT_TOGGLE') {
-           const updated = currentHabits.map((h: any) => {
-             if (h.id === payload.id) {
-               const newCompleted = payload.completed;
-               const newStreak = newCompleted ? h.count + 1 : Math.max(0, h.count - 1);
-               if (newCompleted) recordHabitCompleted(h.text);
-               else removeHabitCompleted(h.text);
-               return { ...h, completed: newCompleted, count: newStreak, lastCompletedDate: new Date().toISOString() };
-             }
-             return h;
-           });
-           setHabits(updated);
-           await AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
-           broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
+          const raw = await AsyncStorage.getItem('@habits_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const today = new Date().toISOString().split('T')[0];
+          const updated = stored.map((h: any) => {
+            if (h.id !== payload.id) return h;
+            const newCompleted = payload.completed;
+            const newCount = newCompleted ? (h.count || 0) + 1 : Math.max(0, (h.count || 0) - 1);
+            return { ...h, completed: newCompleted, count: newCount, lastCompletedDate: newCompleted ? today : undefined };
+          });
+          setHabits(updated);
+          await AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
         }
+
+        else if (type === 'HABIT_ADD') {
+          const raw = await AsyncStorage.getItem('@habits_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const newHabit = { id: payload.id || String(Date.now()), name: payload.name, iconName: payload.iconName || '🧘', iconType: 'emoji', completed: false, count: 0, expectedMinutes: payload.expectedMinutes };
+          const updated = [...stored, newHabit];
+          setHabits(updated);
+          await AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
+        }
+
+        else if (type === 'HABIT_UPDATE') {
+          const raw = await AsyncStorage.getItem('@habits_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const updated = stored.map((h: any) => h.id === payload.id ? { ...h, name: payload.name ?? h.name, iconName: payload.iconName ?? h.iconName, expectedMinutes: payload.expectedMinutes ?? h.expectedMinutes } : h);
+          setHabits(updated);
+          await AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
+        }
+
+        else if (type === 'HABIT_DELETE') {
+          const raw = await AsyncStorage.getItem('@habits_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const updated = stored.filter((h: any) => h.id !== payload.id);
+          setHabits(updated);
+          await AsyncStorage.setItem('@habits_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('HABIT_STATE_UPDATE', { habits: updated });
+        }
+
         else if (type === 'TASK_ADD') {
-          const newTask = {
-             id: payload.id || String(Date.now()),
-             text: payload.title,
-             completed: false,
-             archived: false,
-             priority: payload.priority || 'med',
-             subtasks: [],
-             createdAt: Date.now()
-          };
-          tasks.unshift(newTask);
-          await AsyncStorage.setItem('@todos_v3', JSON.stringify(tasks));
-          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(tasks) });
+          const raw = await AsyncStorage.getItem('@todos_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const newTask = { id: payload.id || String(Date.now()), text: payload.title, completed: false, archived: false, priority: payload.priority || 'med', tag: payload.tag || '', subtasks: payload.subtasks || [], createdAt: Date.now() };
+          const updated = [newTask, ...stored];
+          await AsyncStorage.setItem('@todos_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(updated) });
         }
+
         else if (type === 'TASK_TOGGLE') {
-          tasks = tasks.map((t: any) => t.id === payload.id ? { ...t, completed: payload.completed } : t);
-          await AsyncStorage.setItem('@todos_v3', JSON.stringify(tasks));
-          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(tasks) });
+          const raw = await AsyncStorage.getItem('@todos_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const updated = stored.map((t: any) => t.id === payload.id ? { ...t, completed: payload.completed } : t);
+          await AsyncStorage.setItem('@todos_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(updated) });
         }
+
+        else if (type === 'TASK_UPDATE') {
+          const raw = await AsyncStorage.getItem('@todos_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const updated = stored.map((t: any) => t.id === payload.id ? { ...t, text: payload.title ?? t.text, priority: payload.priority ?? t.priority, tag: payload.tag ?? t.tag, notes: payload.notes ?? t.notes, subtasks: payload.subtasks ?? t.subtasks } : t);
+          await AsyncStorage.setItem('@todos_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(updated) });
+        }
+
         else if (type === 'TASK_DELETE') {
-          tasks = tasks.filter((t: any) => t.id !== payload.id);
-          await AsyncStorage.setItem('@todos_v3', JSON.stringify(tasks));
-          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(tasks) });
+          const raw = await AsyncStorage.getItem('@todos_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const updated = stored.filter((t: any) => t.id !== payload.id);
+          await AsyncStorage.setItem('@todos_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('TASK_STATE_UPDATE', { tasks: formatTasks(updated) });
         }
+
         else if (type === 'NOTE_ADD') {
-          const newNote = {
-             id: `note-${Date.now()}`,
-             title: payload.title || 'Remote Entry',
-             content: payload.content || '',
-             date: new Date().toISOString()
-          };
-          notes.unshift(newNote);
-          await AsyncStorage.setItem('@daily_notes_v3', JSON.stringify(notes));
-          broadcastSyncUpdate('NOTE_STATE_UPDATE', { notes: formatNotes(notes) });
+          const raw = await AsyncStorage.getItem('@daily_notes_v3');
+          const stored: any[] = raw ? JSON.parse(raw) : [];
+          const newNote = { id: `note-${Date.now()}`, title: payload.title || 'Remote Entry', content: payload.content || '', mood: payload.mood || null, date: new Date().toISOString(), dateRaw: Date.now(), isPinned: false };
+          const updated = [newNote, ...stored];
+          await AsyncStorage.setItem('@daily_notes_v3', JSON.stringify(updated));
+          broadcastSyncUpdate('NOTE_STATE_UPDATE', { notes: formatNotes(updated) });
         }
+
         else if (['TIMER_START', 'TIMER_PAUSE', 'TIMER_RESET'].includes(type)) {
           broadcastSyncUpdate('TIMER_STATE_UPDATE', {
-             isRunning: type === 'TIMER_START',
-             timeRemaining: type === 'TIMER_RESET' ? 1500 : (payload?.timeRemaining || 1500),
-             mode: payload?.mode || 'FOCUS'
+            isRunning: type === 'TIMER_START',
+            timeRemaining: type === 'TIMER_RESET' ? 1500 : (payload?.timeRemaining || 1500),
+            mode: payload?.mode || 'FOCUS'
           });
         }
       } catch (e) {
-        console.error('Core sync mapping error', e);
+        console.error('[SyncService] handler error', e);
       }
     });
     return unsub;

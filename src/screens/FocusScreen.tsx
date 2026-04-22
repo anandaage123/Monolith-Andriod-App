@@ -14,7 +14,8 @@ import {
   TouchableOpacity,
   TouchableNativeFeedback,
   Modal,
-  AppState
+  AppState,
+  DeviceEventEmitter,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -29,6 +30,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAudioPlayer } from 'expo-audio';
 import { recordFocusSession, recordHabitCompleted, recordTodoCompleted } from '../services/DailyLogService';
 import WidgetBridge from '../services/WidgetBridge';
+import { subscribeToSync, broadcastSyncUpdate } from '../services/SyncService';
 
 // ─── Task Selection Types ──────────────────────────────────────────────────
 interface LinkedTask {
@@ -1032,6 +1034,48 @@ export default function FocusScreen() {
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
   }, [scheduleNextNotif]);
+
+  // ─── Web remote timer control ────────────────────────────────────────────────
+  useEffect(() => {
+    const unsub = subscribeToSync((type, payload) => {
+      if (type === 'TIMER_START') {
+        const secs = payload?.timeRemaining ?? timeLeftRef.current;
+        if (statusRef.current === 'setup') {
+          // Boot a fresh session driven from the web
+          const sprints = isZenMode ? 1 : isCustomMode ? customSprints : mode.sprints;
+          setTotalSprints(sprints);
+          setCompletedSprints(0);
+          setCurrentSprint(0);
+          setTimeLeft(secs);
+          setTotalTime(secs);
+          setSessionStartTime(Date.now());
+          setStatus('focus');
+        } else {
+          if (secs > 0) setTimeLeft(secs);
+        }
+        setIsActive(true);
+        broadcastSyncUpdate('TIMER_STATE_UPDATE', { isRunning: true, timeRemaining: secs, mode: 'FOCUS' });
+      } else if (type === 'TIMER_PAUSE') {
+        setIsActive(false);
+        broadcastSyncUpdate('TIMER_STATE_UPDATE', { isRunning: false, timeRemaining: timeLeftRef.current, mode: statusRef.current.toUpperCase() });
+      } else if (type === 'TIMER_RESET') {
+        setIsActive(false);
+        setStatus('setup');
+        broadcastSyncUpdate('TIMER_STATE_UPDATE', { isRunning: false, timeRemaining: 0, mode: 'FOCUS' });
+      }
+    });
+    return () => unsub();
+  }, [isZenMode, isCustomMode, customSprints, mode.sprints]);
+
+  // ─── Widget play/pause button ────────────────────────────────────────────────
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = DeviceEventEmitter.addListener('onWidgetTimerToggle', () => {
+      if (statusRef.current === 'setup') return; // nothing running
+      setIsActive(prev => !prev);
+    });
+    return () => sub.remove();
+  }, []);
 
   const loadLogs = async () => {
     try {
